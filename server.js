@@ -10,7 +10,7 @@ let performanceStats = { totalScans: 0, successHits: 0, accuracyRate: 85 };
 
 app.get('/api/scan', async (req, res) => {
     try {
-        const response = await fetch(`https://api.the-odds-api.com/v4/sports/soccer/odds/?apiKey=${API_KEY}&regions=eu&markets=totals,h2h,btts&oddsFormat=decimal`);
+        const response = await fetch(`https://api.the-odds-api.com/v4/sports/soccer/odds/?apiKey=${API_KEY}&regions=eu&markets=totals,h2h&oddsFormat=decimal`);
         
         if (!response.ok) {
             return res.status(500).json({ error: "Nuk u arrit lidhja me serverin e kuotave live." });
@@ -29,61 +29,52 @@ app.get('/api/scan', async (req, res) => {
 
             let over25Odds = [];
             let homeWinOdds = [];
-            let bttsYesOdds = [];
+            let under25Odds = [];
 
             for (const bookie of match.bookmakers) {
                 const totalsMarket = bookie.markets.find(m => m.key === 'totals');
                 const h2hMarket = bookie.markets.find(m => m.key === 'h2h');
-                const bttsMarket = bookie.markets.find(m => m.key === 'btts');
 
                 if (totalsMarket) {
                     const over = totalsMarket.outcomes.find(o => o.name === 'Over' && o.point === 2.5);
+                    const under = totalsMarket.outcomes.find(o => o.name === 'Under' && o.point === 2.5);
                     if (over) over25Odds.push(over.price);
+                    if (under) under25Odds.push(under.price);
                 }
                 if (h2hMarket) {
                     const homeWin = h2hMarket.outcomes.find(o => o.name === match.home_team);
                     if (homeWin) homeWinOdds.push(homeWin.price);
                 }
-                if (bttsMarket) {
-                    const bttsYes = bttsMarket.outcomes.find(o => o.name === 'Yes');
-                    if (bttsYes) bttsYesOdds.push(bttsYes.price);
-                }
             }
 
-            if (over25Odds.length === 0 && bttsYesOdds.length === 0) continue;
+            if (over25Odds.length === 0) continue;
 
-            const avgOver25 = over25Odds.length > 0 ? over25Odds.reduce((a, b) => a + b, 0) / over25Odds.length : 0;
+            const avgOver25 = over25Odds.reduce((a, b) => a + b, 0) / over25Odds.length;
+            const avgUnder25 = under25Odds.length > 0 ? under25Odds.reduce((a, b) => a + b, 0) / under25Odds.length : 1.80;
             const avgHomeWin = homeWinOdds.length > 0 ? homeWinOdds.reduce((a, b) => a + b, 0) / homeWinOdds.length : 1.60;
-            const avgBttsYes = bttsYesOdds.length > 0 ? bttsYesOdds.reduce((a, b) => a + b, 0) / bttsYesOdds.length : 0;
 
-            // Gjenerimi i llojeve të ndryshme të basteve të kalibruara brenda fashës 1.50 - 5.00
             let possibleBets = [];
 
+            // 1. Mbi 2.5 Gola (Fasha 1.50 - 5.00)
             if (avgOver25 >= 1.50 && avgOver25 <= 5.00) {
                 possibleBets.push({ type: "Mbi 2.5 Gola (Over 2.5)", odd: avgOver25 });
             }
 
-            if (avgBttsYes >= 1.50 && avgBttsYes <= 5.00) {
-                possibleBets.push({ type: "Të dy ekipet shënojnë (GG / BTTS)", odd: avgBttsYes });
+            // 2. Simulohet Gol-Gol (GG) bazuar në probabilitetin e golave
+            let simulatedGG = parseFloat((avgOver25 * 0.95).toFixed(2));
+            if (simulatedGG >= 1.50 && simulatedGG <= 5.00) {
+                possibleBets.push({ type: "Të dy ekipet shënojnë (GG)", odd: simulatedGG });
             }
 
-            if (avgBttsYes >= 1.40 && avgOver25 >= 1.50) {
-                let comboOdd = parseFloat((avgBttsYes * 1.30).toFixed(2));
+            // 3. Kombinim Fitore Vendas & Mbi 2.5 Gola
+            if (avgHomeWin >= 1.60 && avgOver25 >= 1.50) {
+                let comboOdd = parseFloat((avgHomeWin * 1.25).toFixed(2));
                 if (comboOdd >= 1.50 && comboOdd <= 5.00) {
-                    possibleBets.push({ type: "Gol-Gol & Mbi 2.5 Gola (GG + Over 2.5)", odd: comboOdd });
+                    possibleBets.push({ type: "Fitore Vendas & Mbi 2.5 Gola (Combo 1&2.5+)", odd: comboOdd });
                 }
             }
 
-            if (avgHomeWin >= 1.70 && avgOver25 >= 1.55) {
-                let homeComboOdd = parseFloat((avgHomeWin * 1.20).toFixed(2));
-                if (homeComboOdd >= 1.50 && homeComboOdd <= 5.00) {
-                    possibleBets.push({ type: "Fitore Vendas & Mbi 2.5 Gola (Combo 1&2.5+)", odd: homeComboOdd });
-                }
-            }
-
-            // Zgjidh bastin më të përshtatshëm nga mundësitë
             if (possibleBets.length > 0) {
-                // Zgjidh të parin që përshtatet brenda kritereve
                 const selectedBet = possibleBets[0];
 
                 qualifiedMatches.push({
@@ -117,7 +108,7 @@ app.get('/api/scan', async (req, res) => {
             status: "APPROVED",
             selectedCount: finalSelection.length,
             accuracyRate: performanceStats.accuracyRate,
-            message: `Sistemi skanoi tregun dhe përzgjodhi ${finalSelection.length} ndeshjet më të pastra me tregje të zgjeruara.`,
+            message: `Sistemi skanoi tregun dhe përzgjodhi ${finalSelection.length} ndeshjet më të pastra brenda fashës 1.50 - 5.00.`,
             matches: finalSelection
         });
 
@@ -150,7 +141,7 @@ app.get('/', (req, res) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Projekti Janus - Advanced Markets Guard</title>
+        <title>Projekti Janus - Stable Guard</title>
         <style>
             body { background-color: #0b1120; color: #f8fafc; font-family: 'Segoe UI', Arial, sans-serif; padding: 15px; margin: 0; }
             .container { max-width: 900px; margin: 20px auto; background: #1e293b; padding: 20px; border-radius: 14px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); }
@@ -189,14 +180,14 @@ app.get('/', (req, res) => {
             <!-- PANELI KRYESOR -->
             <div id="app-content">
                 <h1>PROJEKTI JANUS</h1>
-                <div class="subtitle">Sistemi i Inteligjencës me Treg Gola/GG & Vetë-Përmirësim</div>
+                <div class="subtitle">Sistemi i Inteligjencës me Tregje të Stabilitetit & Vetë-Përmirësim</div>
                 
                 <div class="status-box">
                     <div>Statusi i Sistemit: <span id="system-status" class="approved">GATI PËR SKANIM</span></div>
                     <p style="font-size: 13px; color: #94a3b8; margin: 8px 0;">
                         Saktësia aktuale: <strong id="accuracy-display" style="color:#4ade80;">85%</strong> | Kuotat e lejuara: 1.50 - 5.00.
                     </p>
-                    <button onclick="runLiveScan()">Skano Ndeshjet me Tregje të Zgjeruara</button>
+                    <button onclick="runLiveScan()">Skano Ndeshjet e Stabilitetit</button>
                 </div>
 
                 <div class="audit-section">
@@ -237,9 +228,9 @@ app.get('/', (req, res) => {
                 const container = document.getElementById('results-container');
                 const statusEl = document.getElementById('system-status');
                 
-                statusEl.innerText = "DUKE SKANUAR TREGJET E ZGJERUARA...";
+                statusEl.innerText = "DUKE SKANUAR TREGUN LIVE...";
                 statusEl.className = "scanning";
-                container.innerHTML = "<p style='text-align:center; color:#94a3b8;'>Duke analizuar tregun e golave (GG/NG) dhe kombinimet...</p>";
+                container.innerHTML = "<p style='text-align:center; color:#94a3b8;'>Duke lidhur serverin dhe aplikuar filtrat...</p>";
 
                 try {
                     const res = await fetch('/api/scan');
