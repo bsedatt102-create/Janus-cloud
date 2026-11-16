@@ -1,4 +1,3 @@
-
 const express = require('express');
 const app = express();
 app.use(express.json());
@@ -7,10 +6,10 @@ const PORT = process.env.PORT || 10000;
 const API_KEY = '294b2c55df8cfcabc587f6539cc5e2ab';
 
 // ==========================================================
-// VENDOS KËTU TË DHËNAT E TUA TË ADMINISTRATORIT
+// TË DHËNAT E ADMINISTRATORIT
 // ==========================================================
-const ADMIN_EMAIL = "sedatbatatina@gmail.com";       // Ndryshoje me emailin tënd personal nëse dëshiron
-const Albinkurti2026 = "adminpassword";     // Vendos një fjalëkalim të sigurt për ty
+const ADMIN_EMAIL = "sedat@admin.com";
+const ADMIN_PASSWORD = "adminpassword";
 
 let usersDatabase = [
     { 
@@ -109,9 +108,9 @@ app.post('/api/admin/activate', (req, res) => {
     if (target) {
         target.subscriptionActive = true;
         if (target.plan.includes("Pay-per-Scan")) {
-            target.scansLeft = 1; // 1 skanim i garantuar me 3-8 lojëra
+            target.scansLeft = 1; 
         } else {
-            target.scansLeft = 999; // Qasje e pakufizuar gjatë kohëzgjatjes së abonimit
+            target.scansLeft = 999; 
         }
         return res.json({ success: true });
     }
@@ -216,7 +215,6 @@ app.post('/api/scan', async (req, res) => {
 
         const finalSelection = qualifiedMatches.slice(0, 8);
 
-        // GARANCIA PAY-PER-SCAN (3-8 lojëra, mbron kreditin nëse < 3)
         if (isPayPerScan) {
             if (finalSelection.length < 3) {
                 return res.json({
@@ -315,7 +313,7 @@ app.get('/', (req, res) => {
     <body>
         <div class="container">
             <div class="header-flex">
-                <span style="font-size: 12px; color: #94a3b8;">Vers. 8.1 Secure Admin Hub</span>
+                <span style="font-size: 12px; color: #94a3b8;">Vers. 8.2 Fixed & Ready</span>
                 <button class="lang-switch" onclick="toggleLanguage()" id="lang-btn">EN / Shqip</button>
             </div>
 
@@ -323,7 +321,6 @@ app.get('/', (req, res) => {
                 <h1 id="auth-title">PROJEKTI JANUS</h1>
                 <div class="subtitle" id="auth-subtitle">Sistemi Inteligjent Multi-Market</div>
                 
-                <!-- LOGIN -->
                 <div class="auth-box" id="login-container">
                     <h3 id="l-heading" style="margin-top:0; color:#38bdf8;">Hyr në Llogari</h3>
                     <input type="email" id="login-email" class="auth-input" placeholder="Email...">
@@ -334,7 +331,6 @@ app.get('/', (req, res) => {
                     <span class="tab-link" onclick="switchAuthMode('register')" id="to-register">Nuk ke llogari? Regjistrohu & Zgjidh Paketën</span>
                 </div>
 
-                <!-- REGISTER -->
                 <div class="auth-box" id="register-container" style="display:none;">
                     <h3 id="r-heading" style="margin-top:0; color:#38bdf8;">Krijo Llogari & Zgjidh Paketën</h3>
                     <input type="email" id="reg-email" class="auth-input" placeholder="Email juaj...">
@@ -354,7 +350,6 @@ app.get('/', (req, res) => {
                 </div>
             </div>
 
-            <!-- PANELI KRYESOR -->
             <div id="app-content">
                 <h1>PROJEKTI JANUS</h1>
                 <div class="subtitle" id="m-subtitle">Paneli i Anëtarësisë & Skanuesit Multi-Market</div>
@@ -368,7 +363,6 @@ app.get('/', (req, res) => {
                     <button class="main-btn" onclick="runLiveScan()" id="m-scan-btn">Skano Tregun Live</button>
                 </div>
 
-                <!-- PANELI I ADMINIT -->
                 <div id="admin-panel" class="audit-section" style="display:none; border-color: #facc15;">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
                         <h3 style="color:#facc15; margin:0;">Paneli i Administratorit (Njoftimet & Aktivizimet)</h3>
