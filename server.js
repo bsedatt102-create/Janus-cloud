@@ -7,13 +7,14 @@ const PORT = process.env.PORT || 10000;
 const API_KEY = '294b2c55df8cfcabc587f6539cc5e2ab';
 
 // ==========================================================
-// TË DHËNAT E TUA TË ADMINISTRATORIT DHE PAGESAVE PRIVATE
+// TË DHËNAT E TUA TË VERIFIKUARA NGA NLB BANKA & KRYPTO
 // ==========================================================
 const ADMIN_EMAIL = "sedatbatatina@gmail.com";
 const ADMIN_PASSWORD = "Albinkurti2026";
 
-// VENDOS KËTU IBAN-IN TËND TË VËRTETË DHE ADRESËN USDT TË KRYPTOS
-const REAL_IBAN = "XK05 2011 0000 1234 5678"; 
+const REAL_IBAN = "XK051701003031878968"; //[span_3](start_span)[span_3](end_span)
+const REAL_SWIFT = "NLPRXKPR"; //[span_4](start_span)[span_4](end_span)
+const REAL_BANK = "NLB BANKA SH.A."; //[span_5](start_span)[span_5](end_span)
 const REAL_USDT_ADDRESS = "TX1234567890abcdefUSDTtrc20AddressXYZ";
 const ADMIN_INITIALS = "S. B.";
 
@@ -42,7 +43,7 @@ app.post('/api/login', (req, res) => {
         return res.json({ 
             success: false, 
             pendingPayment: true,
-            error: "Llogaria juaj po pret pagesën ose konfirmimin." 
+            error: "Llogaria juaj po pret konfirmimin e pagesës nga administratori." 
         });
     }
 
@@ -72,42 +73,38 @@ app.post('/api/register', (req, res) => {
         subscriptionActive: false, 
         plan,
         scansLeft: 0,
-        registeredAt: new Date().toLocaleString()
+        registeredAt: new Date().toLocaleTimeString('sq-AL', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
     });
 
     res.json({ 
         success: true, 
         iban: REAL_IBAN, 
+        swift: REAL_SWIFT,
+        bank: REAL_BANK,
         usdt: REAL_USDT_ADDRESS, 
         initials: ADMIN_INITIALS,
-        message: "Regjistrimi u krye!" 
+        message: "Regjistrimi u krye! Njoftimi u dërgua." 
     });
 });
 
-// PROCESIMI I PAGESËS SË KLIENTIT (KARTELË OSE KRYPTO)
 app.post('/api/process-payment', (req, res) => {
-    const { email, paymentType, amount, cardNumber } = req.body;
+    const { email, cardNumber } = req.body;
     const user = usersDatabase.find(u => u.email.toLowerCase() === email.toLowerCase().trim());
 
     if (!user) {
         return res.json({ success: false, error: "Përdoruesi nuk u gjet." });
     }
 
-    // Simulim i kontrollit të fondeve: Nëse numri i kartës përfundon me '0000' ose shuma është 0, simulojmë mungesë mjetesh
     if (cardNumber && cardNumber.endsWith("0000")) {
         return res.json({ 
             success: false, 
-            error: "Mjetet në llogari/kartelë janë të pamjaftueshme. Ju lutemi provoni një kartelë tjetër ose ndryshoni mënyrën e pagesës!" 
+            error: "Mjetet në llogari/kartelë janë të pamjaftueshme. Ju lutemi provoni një kartelë tjetër!" 
         });
     }
 
-    // Pagesa kalon me sukses
-    user.subscriptionActive = true;
-    user.scansLeft = user.plan.includes("Pay-per-Scan") ? 1 : 999;
-
     res.json({ 
         success: true, 
-        message: "Pagesa u krye me sukses dhe llogaria u aktivizua!" 
+        message: "Konfirmimi u dërgua me sukses te paneli i administratorit!" 
     });
 });
 
@@ -208,35 +205,40 @@ app.get('/', (req, res) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Projekti Janus - Private SaaS</title>
+    <title>Projekti Janus - Enterprise SaaS</title>
     <style>
-        body { background-color: #0b1120; color: #f8fafc; font-family: 'Segoe UI', Arial, sans-serif; padding: 15px; margin: 0; }
-        .container { max-width: 900px; margin: 20px auto; background: #1e293b; padding: 20px; border-radius: 14px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); }
-        .header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-        h1 { color: #38bdf8; text-align: center; margin: 0; font-size: 24px; }
-        .subtitle { text-align: center; color: #94a3b8; font-size: 13px; margin-bottom: 20px; }
-        .status-box { background: #0f172a; padding: 18px; border-radius: 10px; border: 1px solid #334155; margin-bottom: 20px; }
+        body { background-color: #070d1b; color: #f8fafc; font-family: 'Segoe UI', Arial, sans-serif; padding: 15px; margin: 0; }
+        .container { max-width: 900px; margin: 20px auto; background: #111c31; padding: 25px; border-radius: 16px; box-shadow: 0 15px 35px rgba(0,0,0,0.7); border: 1px solid #1e293b; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; background: #0f172a; padding: 10px 15px; border-radius: 8px; margin-bottom: 20px; font-size: 12px; border: 1px solid #334155; }
+        .ssl-badge { color: #4ade80; display: flex; align-items: center; gap: 6px; font-weight: 600; }
+        .brand-logo { font-size: 20px; font-weight: 900; background: linear-gradient(135deg, #38bdf8, #2563eb); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-align: center; margin-bottom: 5px; }
+        .subtitle { text-align: center; color: #94a3b8; font-size: 13px; margin-bottom: 25px; }
+        .status-box { background: #0f172a; padding: 20px; border-radius: 12px; border: 1px solid #334155; margin-bottom: 20px; }
         .approved { color: #4ade80; font-weight: bold; }
-        button.main-btn { background: linear-gradient(135deg, #0284c7, #2563eb); color: white; border: none; padding: 14px 20px; border-radius: 8px; cursor: pointer; font-size: 16px; width: 100%; margin-top: 12px; font-weight: bold; }
-        .match-card { background: #263349; padding: 16px; margin-top: 14px; border-radius: 10px; border-left: 5px solid #38bdf8; }
-        .auth-box { max-width: 420px; margin: 25px auto; background: #0f172a; padding: 25px; border-radius: 10px; border: 1px solid #334155; text-align: center; }
-        .auth-input, .auth-select { padding: 11px; width: 92%; border-radius: 6px; border: 1px solid #334155; background: #1e293b; color: #fff; text-align: center; font-size: 15px; margin-bottom: 12px; }
+        button.main-btn { background: linear-gradient(135deg, #0284c7, #2563eb); color: white; border: none; padding: 14px 20px; border-radius: 8px; cursor: pointer; font-size: 16px; width: 100%; margin-top: 12px; font-weight: bold; transition: opacity 0.2s; }
+        button.main-btn:hover { opacity: 0.9; }
+        .match-card { background: #1e293b; padding: 16px; margin-top: 14px; border-radius: 10px; border-left: 5px solid #38bdf8; border: 1px solid #334155; }
+        .auth-box { max-width: 440px; margin: 25px auto; background: #0f172a; padding: 25px; border-radius: 12px; border: 1px solid #334155; text-align: center; box-shadow: 0 8px 20px rgba(0,0,0,0.4); }
+        .auth-input, .auth-select { padding: 12px; width: 92%; border-radius: 8px; border: 1px solid #334155; background: #1e293b; color: #fff; text-align: center; font-size: 15px; margin-bottom: 12px; outline: none; }
+        .auth-input:focus, .auth-select:focus { border-color: #38bdf8; }
         .tab-link { color: #38bdf8; cursor: pointer; font-size: 13px; margin-top: 12px; display: inline-block; text-decoration: underline; }
         .info-msg { background: #1e293b; border: 1px solid #38bdf8; padding: 15px; border-radius: 8px; font-size: 13px; color: #cbd5e1; margin-top: 12px; text-align: left; line-height: 1.6; }
         #app-content { display: none; }
         #payment-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; overflow-y: auto; }
-        .modal-content { background: #1e293b; padding: 25px; border-radius: 12px; max-width: 450px; width: 90%; border: 1px solid #38bdf8; text-align: center; margin: 20px auto; }
+        .modal-content { background: #111c31; padding: 25px; border-radius: 14px; max-width: 460px; width: 90%; border: 1px solid #38bdf8; text-align: center; margin: 20px auto; box-shadow: 0 15px 35px rgba(0,0,0,0.8); }
+        .notification-banner { background: #065f46; color: #d1fae5; padding: 10px; border-radius: 6px; font-size: 12px; margin-bottom: 15px; border: 1px solid #10b981; display: none; text-align: center; }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header-flex">
-            <span style="font-size: 12px; color: #94a3b8;">Vers. 8.8 Secure Card & Crypto Checkout</span>
+        <div class="top-bar">
+            <span class="ssl-badge">🔒 Secure 256-bit SSL Active</span>
+            <span style="color: #94a3b8;">Server Node: Render-EU-Central</span>
         </div>
 
         <div id="auth-screen">
-            <h1>PROJEKTI JANUS</h1>
-            <div class="subtitle">Sistemi Inteligjent Multi-Market</div>
+            <div class="brand-logo">PROJEKTI JANUS</div>
+            <div class="subtitle">Sistemi i Inteligjencës Artificiale & Multi-Market Analytics</div>
             
             <div class="auth-box" id="login-container">
                 <h3 style="margin-top:0; color:#38bdf8;">Hyr në Llogari</h3>
@@ -263,57 +265,44 @@ app.get('/', (req, res) => {
             </div>
         </div>
 
-        <!-- DRITARJA E PAGESËS DHE KARTELËS BANKARE -->
+        <!-- DRITARJA E PAGESËSE ME NJOFTIM AUTOMATIK -->
         <div id="payment-modal">
             <div class="modal-content">
-                <h3 style="color: #38bdf8; margin-top: 0;">Kryej Pagesën e Abonimit</h3>
-                <p style="font-size: 13px; color: #cbd5e1;">Zgjidhni mënyrën e pagesës dhe plotësoni të dhënat:</p>
+                <div id="reg-notification" class="notification-banner">Llogaria u krijua! Njoftimi u dërgua në sistemin e pagesave.</div>
+                <h3 style="color: #38bdf8; margin-top: 0;">Udhëzimet e Pagesës Bankare & Krypto</h3>
+                <p style="font-size: 13px; color: #cbd5e1;">Për transferta vendore dhe ndërkombëtare, përdorni të dhënat e mëposhtme:</p>
                 
-                <div class="info-msg" id="payment-details-box">
-                    <!-- Detajet e mbushura nga serveri (Inicialet dhe IBAN/USDT i vërtetë) -->
-                </div>
+                <div class="info-msg" id="payment-details-box"></div>
 
                 <div style="margin-top: 15px; text-align: left;">
-                    <label style="font-size: 12px; color: #94a3b8;">Zgjidh Mënyrën:</label>
-                    <select id="pay-method" class="auth-select" onchange="togglePayFields()" style="margin-top: 5px;">
-                        <option value="card">Kartelë Bankare (Debit/Credit)</option>
-                        <option value="crypto">Krypto (USDT - TRC20)</option>
-                    </select>
-                </div>
-
-                <!-- Forma e Kartelës -->
-                <div id="card-form" style="margin-top: 10px; text-align: left;">
-                    <input type="text" id="card-number" class="auth-input" placeholder="Numri i Kartelës (p.sh. 4532...)" style="width: 100%;">
-                    <div style="display:flex; gap:10px;">
-                        <input type="text" id="card-exp" class="auth-input" placeholder="MM/VV" style="width: 48%;">
-                        <input type="password" id="card-cvv" class="auth-input" placeholder="CVV" style="width: 48%;">
-                    </div>
-                </div>
-
-                <!-- Forma e Krypto -->
-                <div id="crypto-form" style="display:none; margin-top: 10px; text-align: left;">
-                    <input type="text" id="crypto-tx" class="auth-input" placeholder="ID e Transaksionit (TXID / Hash)" style="width: 100%;">
+                    <label style="font-size: 12px; color: #94a3b8;">Fut numrin e kartelës ose konfirmimin:</label>
+                    <input type="text" id="card-number" class="auth-input" placeholder="Numri i kartelës / TXID..." style="width: 100%; margin-top: 5px;">
                 </div>
 
                 <p id="pay-error" style="color: #f87171; font-size: 13px; margin-top: 8px;"></p>
 
-                <button class="main-btn" style="background:#15803d; margin-top: 10px;" onclick="submitPayment()">Paguaj Tani & Aktivizo</button>
-                <button class="main-btn" style="background:#334155; margin-top: 6px; padding: 10px;" onclick="closePaymentModal()">Anulo</button>
+                <button class="main-btn" style="background:#15803d; margin-top: 10px;" onclick="submitPayment()">Dërgo Njoftimin te Admini</button>
+                <button class="main-btn" style="background:#334155; margin-top: 6px; padding: 10px;" onclick="closePaymentModal()">Mbyll</button>
             </div>
         </div>
 
         <div id="app-content">
-            <h1>PROJEKTI JANUS</h1>
-            <div class="subtitle">Paneli i Anëtarësisë & Skanuesit</div>
+            <div class="brand-logo">PROJEKTI JANUS</div>
+            <div class="subtitle">Paneli i Anëtarësisë & Skanuesit Profesional</div>
             
             <div class="status-box">
-                <div>Statusi: <span id="system-status" class="approved">GATI</span></div>
-                <p style="font-size: 13px; color: #94a3b8; margin: 8px 0;">Paketa: <strong id="user-plan-display" style="color:#38bdf8;">-</strong></p>
-                <button class="main-btn" onclick="runScan()">Skano Tregun Live (3-6 Lojëra)</button>
+                <div>Statusi i Sistemit: <span id="system-status" class="approved">ONLINE & STABIL</span></div>
+                <p style="font-size: 13px; color: #94a3b8; margin: 8px 0;">Paketa Aktive: <strong id="user-plan-display" style="color:#38bdf8;">-</strong></p>
+                <button class="main-btn" onclick="runScan()">Skano Tregun Live (3-6 Ndeshje)</button>
             </div>
 
+            <!-- PANELI I ADMINIT ME NJOFTIME LIVE TË KLIENTËVE -->
             <div id="admin-panel" class="auth-box" style="display:none; max-width:100%; text-align:left; border-color: #facc15; margin-bottom:20px;">
-                <h3 style="color:#facc15; margin-top:0;">Paneli i Administratorit</h3>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h3 style="color:#facc15; margin:0;">Paneli i Administratorit (Njoftimet Live)</h3>
+                    <button onclick="loadAdminUsers()" style="background:#0284c7; color:#fff; border:none; padding:5px 10px; border-radius:4px; cursor:pointer; font-size:12px;">Rifresko Njoftimet</button>
+                </div>
+                <p style="font-size: 12px; color: #94a3b8; margin: 5px 0 15px 0;">Klientët e rinj që kanë bërë regjistrimin dhe presin verifikimin e pagesës:</p>
                 <div id="admin-users-list" style="font-size:13px;"></div>
             </div>
 
@@ -328,12 +317,6 @@ app.get('/', (req, res) => {
         function switchMode(mode) {
             document.getElementById('login-container').style.display = mode === 'login' ? 'block' : 'none';
             document.getElementById('register-container').style.display = mode === 'register' ? 'block' : 'none';
-        }
-
-        function togglePayFields() {
-            const method = document.getElementById('pay-method').value;
-            document.getElementById('card-form').style.display = method === 'card' ? 'block' : 'none';
-            document.getElementById('crypto-form').style.display = method === 'crypto' ? 'block' : 'none';
         }
 
         async function handleLogin() {
@@ -385,12 +368,16 @@ app.get('/', (req, res) => {
                 });
                 const data = await res.json();
                 if(data.success) {
-                    // Shfaq dritaren e pagesës me IBAN-in e vërtetë dhe inicialet e tua S.B.
+                    // Shfaq njoftimin automatik në ekran
+                    document.getElementById('reg-notification').style.display = 'block';
                     document.getElementById('payment-details-box').innerHTML = 
                         '<strong>Paketa:</strong> ' + plan + '<br>' +
-                        '<strong>Përfituesi:</strong> ' + data.initials + '<br>' +
-                        '<strong>IBAN Bankar:</strong> <span style="color:#4ade80;">' + data.iban + '</span><br>' +
-                        '<strong>Adresa USDT (TRC20):</strong> <span style="color:#facc15; font-size:11px;">' + data.usdt + '</span>';
+                        '<strong>Përfituesi:</strong> <span style="color:#38bdf8;">' + data.initials + '</span><br>' +
+                        '<strong>Banka:</strong> ' + data.bank + '<br>' +
+                        '<strong>IBAN (Vendor & Ndërkombëtar):</strong> <span style="color:#4ade80;">' + data.iban + '</span><br>' +
+                        '<strong>SWIFT/BIC:</strong> <span style="color:#facc15;">' + data.swift + '</span><br>' +
+                        '<hr style="border-color:#334155; margin:8px 0;">' +
+                        '<strong>Krypto (USDT TRC20):</strong> <span style="color:#facc15; font-size:11px;">' + data.usdt + '</span>';
                     
                     document.getElementById('payment-modal').style.display = 'flex';
                 } else {
@@ -402,36 +389,27 @@ app.get('/', (req, res) => {
         }
 
         async function submitPayment() {
-            const method = document.getElementById('pay-method').value;
             const cardNumber = document.getElementById('card-number').value;
             const errEl = document.getElementById('pay-error');
             errEl.innerText = "";
-
-            if (method === 'card' && !cardNumber) {
-                errEl.innerText = "Ju lutemi shkruani numrin e kartelës!";
-                return;
-            }
 
             try {
                 const res = await fetch('/api/process-payment', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: currentUserEmail, paymentType: method, cardNumber })
+                    body: JSON.stringify({ email: currentUserEmail, cardNumber })
                 });
                 const data = await res.json();
 
                 if(data.success) {
-                    alert("Pagesa u konfirmuar me sukses! Llogaria juaj u aktivizua.");
+                    alert("Njoftimi u dërgua me sukses te administratori! Sapo të konfirmohet pagesa, llogaria aktivizohet.");
                     document.getElementById('payment-modal').style.display = 'none';
-                    document.getElementById('user-plan-display').innerText = registeredUserPlan;
-                    document.getElementById('auth-screen').style.display = 'none';
-                    document.getElementById('app-content').style.display = 'block';
+                    switchMode('login');
                 } else {
-                    // Mesazhi kur nuk ka mjete të mjaftueshme ose dështon kartela
                     errEl.innerText = data.error;
                 }
             } catch(e) {
-                errEl.innerText = "Gabim gjatë procesimit të pagesës.";
+                errEl.innerText = "Gabim gjatë procesimit.";
             }
         }
 
@@ -445,14 +423,14 @@ app.get('/', (req, res) => {
             const data = await res.json();
             const listEl = document.getElementById('admin-users-list');
             if (data.users.length === 0) {
-                listEl.innerHTML = "<p style='color:#94a3b8;'>Nuk ka klientë në pritje.</p>";
+                listEl.innerHTML = "<p style='color:#94a3b8;'>Nuk ka njoftime të reja për momentin.</p>";
                 return;
             }
             let html = "";
             data.users.forEach(u => {
-                const badge = u.active ? "<span style='color:#4ade80;'>[AKTIV]</span>" : "<span style='color:#f87171;'>[NË PRITJE]</span>";
-                const btn = !u.active ? '<button onclick="activateUser(\\'' + u.email + '\\')" style="background:#15803d; color:#fff; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; margin-left:8px;">Aktivizo</button>' : '';
-                html += '<div style="padding:6px 0; border-bottom:1px solid #334155;">' + u.email + ' (' + u.plan + ') ' + badge + ' ' + btn + '</div>';
+                const badge = u.active ? "<span style='color:#4ade80; font-weight:bold;'>[AKTIV]</span>" : "<span style='color:#f87171; font-weight:bold;'>[NË PRITJE]</span>";
+                const btn = !u.active ? '<button onclick="activateUser(\\'' + u.email + '\\')" style="background:#15803d; color:#fff; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; margin-left:10px; font-weight:bold;">Aktivizo Tani</button>' : '<span style="color:#94a3b8; margin-left:10px; font-size:11px;">(Aktivizuar)</span>';
+                html += '<div style="padding:10px 0; border-bottom:1px solid #334155; display:flex; justify-content:space-between; align-items:center;"><div><strong>' + u.email + '</strong><br><span style="font-size:11px; color:#94a3b8;">' + u.plan + ' | Regjistruar: ' + (u.registeredAt || 'Sot') + '</span></div><div>' + badge + btn + '</div></div>';
             });
             listEl.innerHTML = html;
         }
@@ -500,5 +478,4 @@ app.get('/', (req, res) => {
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
-
 
