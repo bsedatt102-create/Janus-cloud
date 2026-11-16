@@ -30,9 +30,8 @@ let usersDatabase = [
 
 let performanceStats = { totalScans: 0, successHits: 0, accuracyRate: 95 };
 
-// Funksioni për të kontrolluar skadimin e abonimit
 function checkSubscriptionExpiry(user) {
-    if (user.subscriptionActive && user. expiryDate) {
+    if (user.subscriptionActive && user.expiryDate) {
         if (new Date() > new Date(user.expiryDate)) {
             user.subscriptionActive = false;
             user.freeScansLeft = 0;
@@ -76,11 +75,10 @@ app.post('/api/register', (req, res) => {
         return res.json({ success: false, error: "Ky emër është i zënë! / Username already taken!" });
     }
 
-    // Kontrollon nëse kjo IP ka krijuar tashmë llogari falas më parë
     const existingIpUser = usersDatabase.find(u => u.ip === clientIp && u.role !== 'admin');
     let freeScans = 3;
     if (existingIpUser) {
-        freeScans = 0; // Nuk merr më skanime falas nëse ka tentuar të hapë shumë llogari nga e njëjta pajisje
+        freeScans = 0; 
     }
 
     usersDatabase.push({ 
@@ -151,8 +149,7 @@ app.post('/api/admin/activate', (req, res) => {
         target.subscriptionActive = true;
         target.freeScansLeft = 999;
 
-        // Llogaritja automatike e skadimit në bazë të planit
-        let daysToAdd = 30; // Parazgjedhje 1 muaj
+        let daysToAdd = 30; 
         if (target.plan.includes("3 Muaj")) daysToAdd = 90;
         if (target.plan.includes("1 Vit")) daysToAdd = 365;
 
@@ -179,31 +176,32 @@ app.post('/api/scan', async (req, res) => {
         });
     }
 
-    const matchPools = [
+    // Pishina e ndeshjeve simuluese, ku zbatohet filtri i rreptë i kuotave (Vetëm mes 1.50 dhe 6.00)
+    const rawMatchPools = [
         [
-            { league: "Premier League (Angli)", home: "Arsenal", away: "Chelsea", time: "21:00", odd: "1.82", betType: "Mbi 2.5 Gola", safetyScore: 94 },
-            { league: "La Liga (Spanjë)", home: "Real Madrid", away: "Barcelona", time: "21:00", odd: "1.88", betType: "Të dyja shënojnë (GG)", safetyScore: 92 },
-            { league: "Serie A (Itali)", home: "Inter", away: "AC Milan", time: "20:45", odd: "1.80", betType: "Mbi 2.5 Gola", safetyScore: 90 },
-            { league: "Bundesliga (Gjermani)", home: "Bayern Munich", away: "Dortmund", time: "18:30", odd: "1.90", betType: "1 & Mbi 2.5", safetyScore: 93 }
+            { league: "Premier League (Angli)", date: "Sot, 21:00", home: "Arsenal", away: "Chelsea", odd: 1.82, betType: "Mbi 2.5 Gola" },
+            { league: "La Liga (Spanjë)", date: "Sot, 21:00", home: "Real Madrid", away: "Barcelona", odd: 1.88, betType: "Të dyja shënojnë (GG)" },
+            { league: "Serie A (Itali)", date: "Nesër, 20:45", home: "Inter", away: "AC Milan", odd: 1.80, betType: "Mbi 2.5 Gola" },
+            { league: "Bundesliga (Gjermani)", date: "Nesër, 18:30", home: "Bayern Munich", away: "Dortmund", odd: 1.90, betType: "1 & Mbi 2.5" }
         ],
         [
-            { league: "Ligue 1 (Francë)", home: "PSG", away: "Marseille", time: "21:00", odd: "1.75", betType: "1 & Mbi 1.5 Gola", safetyScore: 91 },
-            { league: "Eredivisie (Holandë)", home: "Ajax", away: "Feyenoord", time: "16:45", odd: "1.95", betType: "Mbi 3.5 Gola", safetyScore: 89 },
-            { league: "Premier League (Angli)", home: "Liverpool", away: "Manchester City", time: "17:30", odd: "2.05", betType: "GG & Mbi 2.5", safetyScore: 95 },
-            { league: "Serie A (Itali)", home: "Juventus", away: "Napoli", time: "20:45", odd: "1.85", betType: "1X & Mbi 1.5", safetyScore: 92 },
-            { league: "La Liga (Spanjë)", home: "Atletico Madrid", away: "Villarreal", time: "19:00", odd: "1.78", betType: "1 (Fiton Nikoqiri)", safetyScore: 90 }
+            { league: "Ligue 1 (Francë)", date: "Sot, 21:00", home: "PSG", away: "Marseille", odd: 1.75, betType: "1 & Mbi 1.5 Gola" },
+            { league: "Eredivisie (Holandë)", date: "Pasnesër, 16:45", home: "Ajax", away: "Feyenoord", odd: 2.15, betType: "Mbi 3.5 Gola" },
+            { league: "Premier League (Angli)", date: "Nesër, 17:30", home: "Liverpool", away: "Manchester City", odd: 2.05, betType: "GG & Mbi 2.5" },
+            { league: "Serie A (Itali)", date: "Pasnesër, 20:45", home: "Juventus", away: "Napoli", odd: 1.85, betType: "1X & Mbi 1.5" }
         ],
         [
-            { league: "Bundesliga (Gjermani)", home: "Leverkusen", away: "RB Leipzig", time: "15:30", odd: "1.82", betType: "Të dyja shënojnë (GG)", safetyScore: 92 },
-            { league: "Premier League (Angli)", home: "Tottenham", away: "Aston Villa", time: "16:00", odd: "1.90", betType: "Mbi 2.5 Gola", safetyScore: 91 },
-            { league: "Serie A (Itali)", home: "Roma", away: "Lazio", time: "18:00", odd: "1.76", betType: "1X (Nikoqiri ose Barazim)", safetyScore: 93 },
-            { league: "La Liga (Spanjë)", home: "Real Sociedad", away: "Athletic Bilbao", time: "21:00", odd: "2.10", betType: "Mbi 1.5 Gola", safetyScore: 89 },
-            { league: "Ligue 1 (Francë)", home: "Monaco", away: "Lille", time: "17:00", odd: "1.84", betType: "GG", safetyScore: 90 },
-            { league: "Eredivisie (Holandë)", home: "PSV", away: "AZ Alkmaar", time: "14:30", odd: "1.72", betType: "1 (Fiton Nikoqiri)", safetyScore: 94 }
+            { league: "Bundesliga (Gjermani)", date: "Sot, 15:30", home: "Leverkusen", away: "RB Leipzig", odd: 1.82, betType: "Të dyja shënojnë (GG)" },
+            { league: "Premier League (Angli)", date: "Nesër, 16:00", home: "Tottenham", away: "Aston Villa", odd: 1.90, betType: "Mbi 2.5 Gola" },
+            { league: "Serie A (Itali)", date: "Pasnesër, 18:00", home: "Roma", away: "Lazio", odd: 1.76, betType: "1X (Nikoqiri ose Barazim)" },
+            { league: "La Liga (Spanjë)", date: "Sot, 21:00", home: "Real Sociedad", away: "Athletic Bilbao", odd: 2.10, betType: "Mbi 1.5 Gola" }
         ]
     ];
 
-    let selectedMatches = matchPools[(3 - user.freeScansLeft) % matchPools.length];
+    let selectedPool = rawMatchPools[(3 - user.freeScansLeft) % rawMatchPools.length];
+
+    // FILTRI ZHVILLIMOR: Kuotat duhet të jenë strictly ndërmjet 1.50 dhe 6.00 (Përjashton < 1.5 dhe > 6.0)
+    let filteredMatches = selectedPool.filter(m => m.odd >= 1.50 && m.odd <= 6.00);
 
     if (!user.subscriptionActive) {
         user.freeScansLeft -= 1;
@@ -211,11 +209,11 @@ app.post('/api/scan', async (req, res) => {
 
     res.json({
         status: "APPROVED",
-        selectedCount: selectedMatches.length,
+        selectedCount: filteredMatches.length,
         freeScansLeft: user.freeScansLeft,
         subscriptionActive: user.subscriptionActive,
         accuracyRate: performanceStats.accuracyRate,
-        matches: selectedMatches
+        matches: filteredMatches
     });
 });
 
@@ -643,7 +641,7 @@ app.get('/', (req, res) => {
 
         async function runScan() {
             const container = document.getElementById('results-container');
-            container.innerHTML = "<p style='color:#facc15;'>Duke skanuar tregjet / Scanning markets...</p>";
+            container.innerHTML = "<p style='color:#facc15;'>Duke skanuar tregjet (Kuotat 1.50 - 6.00)...</p>";
             
             try {
                 const res = await fetch('/api/scan', {
@@ -666,9 +664,9 @@ app.get('/', (req, res) => {
                     document.getElementById('subscribe-trigger-btn').style.display = "block";
                 }
 
-                let html = "<p><strong>Bileta e Përzgjedhur / Selected Ticket (" + data.selectedCount + " Verified Matches):</strong></p>";
+                let html = "<p><strong>Bileta e Përzgjedhur / Selected Ticket (" + data.selectedCount + " Verified Matches - Odds 1.50 to 6.00):</strong></p>";
                 data.matches.forEach(m => {
-                    html += '<div class="match-card"><span style="color:#94a3b8; font-size:12px;">' + m.league + ' - ' + m.time + '</span><br><strong>' + m.home + ' vs ' + m.away + '</strong><br>Type: <span style="color:#38bdf8;">' + m.betType + '</span> | Odd: ' + m.odd + '</div>';
+                    html += '<div class="match-card"><span style="color:#38bdf8; font-size:12px;">📅 ' + m.date + ' | ' + m.league + '</span><br><strong>' + m.home + ' vs ' + m.away + '</strong><br>Type: <span style="color:#4ade80;">' + m.betType + '</span> | Odd: <strong>' + m.odd + '</strong></div>';
                 });
                 container.innerHTML = html;
             } catch(e) {
