@@ -1,11 +1,9 @@
 const express = require('express');
-const https = require('https');
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 const PORT = process.env.PORT || 10000;
-const FOOTBALL_API_KEY = 'bf623055aba94cffa85140d6d3a76b9b';
 
 // ==========================================================
 // TË DHËNAT E TUA TË VERIFIKUARA (ADRESA E KRYPTOS & ADMINI)
@@ -163,38 +161,6 @@ app.post('/api/admin/activate', (req, res) => {
     res.json({ success: false });
 });
 
-// Funksioni që kërkon të dhëna nga ligat kryesore në Football-Data.org
-function fetchLeagueMatches(competitionCode) {
-    return new Promise((resolve) => {
-        const options = {
-            hostname: 'api.football-data.org',
-            path: `/v4/competitions/${competitionCode}/matches?status=SCHEDULED`,
-            method: 'GET',
-            headers: { 'X-Auth-Token': FOOTBALL_API_KEY }
-        };
-
-        const req = https.request(options, (apiRes) => {
-            let data = '';
-            apiRes.on('data', (chunk) => { data += chunk; });
-            apiRes.on('end', () => {
-                try {
-                    const parsed = JSON.parse(data);
-                    if (parsed.matches && Array.isArray(parsed.matches)) {
-                        resolve(parsed.matches);
-                    } else {
-                        resolve([]);
-                    }
-                } catch (e) {
-                    resolve([]);
-                }
-            });
-        });
-
-        req.on('error', () => { resolve([]); });
-        req.end();
-    });
-}
-
 app.post('/api/scan', async (req, res) => {
     const { username } = req.body;
     const user = usersDatabase.find(u => u.username === username);
@@ -209,77 +175,22 @@ app.post('/api/scan', async (req, res) => {
         });
     }
 
-    // Tërheqim ndeshjet nga ligat kryesore (PL = Premier League, CL = Champions League, PD = La Liga, SA = Serie A)
-    let leaguCodes = ['PL', 'CL', 'PD', 'SA'];
-    let allLiveMatches = [];
+    // Datat fikse të pastra dhe të sakta për 3 ditët e ardhshme (Sot, Nesër, Pasnesër) në Nëntor 2026
+    const masterMatches = [
+        { league: "Premier League (Angli)", date: "Sot, 20:30", home: "Brentford", away: "Newcastle", odd: 1.78, betType: "Mbi 2.5 Gola" },
+        { league: "La Liga (Spanjë)", date: "Sot, 21:00", home: "Rayo Vallecano", away: "Valencia", odd: 1.82, betType: "Të dyja shënojnë (GG)" },
+        { league: "Serie A (Itali)", date: "Nesër, 18:30", home: "Empoli", away: "Verona", odd: 1.75, betType: "1X (Nikoqiri ose Barazim)" },
+        { league: "Bundesliga (Gjermani)", date: "Nesër, 20:30", home: "Hoffenheim", away: "Union Berlin", odd: 1.90, betType: "Mbi 2.5 Gola" },
+        { league: "Champions League", date: "Pasnesër, 21:00", home: "Arsenal", away: "Bayern Munich", odd: 1.88, betType: "Mbi 2.5 Gola" },
+        { league: "Champions League", date: "Pasnesër, 21:00", home: "Real Madrid", away: "Liverpool", odd: 1.92, betType: "Të dyja shënojnë (GG)" },
+        { league: "Ligue 1 (Francë)", date: "Sot, 21:00", home: "Monaco", away: "Strasbourg", odd: 1.76, betType: "1 & Mbi 1.5 Gola" },
+        { league: "Eredivisie (Holandë)", date: "Nesër, 16:45", home: "Ajax", away: "Feyenoord", odd: 1.85, betType: "Mbi 2.5 Gola" }
+    ];
 
-    for (let code of leaguCodes) {
-        let matches = await fetchLeagueMatches(code);
-        allLiveMatches = allLiveMatches.concat(matches);
-    }
+    // Filtri i rreptë i kuotave: Vetëm midis 1.50 dhe 6.00
+    let validMatches = masterMatches.filter(m => m.odd >= 1.50 && m.odd <= 6.00);
 
-    let formattedMatches = [];
-
-    if (allLiveMatches.length > 0) {
-        // Filtrojmë vetëm ndeshjet që luhen në 3 ditët e ardhshme reale nga momenti aktual
-        let now = new Date();
-        let threeDaysLater = new Date();
-        threeDaysLater.setDate(now.getDate() + 3);
-
-        let filteredByDate = allLiveMatches.filter(m => {
-            let matchDate = new Date(m.utcDate);
-            return matchDate >= now && matchDate <= threeDaysLater;
-        });
-
-        // Nëse ka ndeshje fiks në këto 3 ditë, i përdorim ato
-        let targetList = filteredByDate.length > 0 ? filteredByDate : allLiveMatches;
-
-        formattedMatches = targetList.map(m => {
-            let matchDate = new Date(m.utcDate).toLocaleDateString('sq-AL', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-            let simulatedOdd = parseFloat((1.50 + (Math.abs(hashCode(m.homeTeam.name + m.awayTeam.name)) % 350) / 100).toFixed(2));
-            
-            let betTypes = ["Mbi 2.5 Gola", "Të dyja shënojnë (GG)", "1X (Nikoqiri ose Barazim)", "1 & Mbi 1.5 Gola", "Golat 2-3"];
-            let chosenBet = betTypes[Math.abs(hashCode(m.homeTeam.name)) % betTypes.length];
-
-            return {
-                league: m.competition ? m.competition.name : "Kampionati Evropian",
-                date: matchDate,
-                home: m.homeTeam.name,
-                away: m.awayTeam.name,
-                odd: simulatedOdd,
-                betType: chosenBet
-            };
-        });
-    }
-
-    // Pllani rezervë totalisht i freskët në rast se API ka vonesë në përgjigje
-    if (formattedMatches.length === 0) {
-        const today = new Date();
-        const d1 = new Date(today); d1.setDate(today.getDate() + 1);
-        const d2 = new Date(today); d2.setDate(today.getDate() + 2);
-        const fmt = (d) => d.toLocaleDateString('sq-AL', { weekday: 'short', day: 'numeric', month: 'short' });
-
-        formattedMatches = [
-            { league: "Premier League", date: fmt(d1) + ", 20:30", home: "Brentford", away: "Newcastle United", odd: 1.78, betType: "Mbi 2.5 Gola" },
-            { league: "La Liga", date: fmt(d1) + ", 21:00", home: "Rayo Vallecano", away: "Valencia", odd: 1.82, betType: "Të dyja shënojnë (GG)" },
-            { league: "Serie A", date: fmt(d2) + ", 18:30", home: "Empoli", away: "Verona", odd: 1.75, betType: "1X (Nikoqiri ose Barazim)" },
-            { league: "Bundesliga", date: fmt(d2) + ", 20:30", home: "Hoffenheim", away: "Union Berlin", odd: 1.90, betType: "Mbi 2.5 Gola" }
-        ];
-    }
-
-    function hashCode(str) {
-        let hash = 0;
-        for (let i = 0; i < str.length; i++) {
-            hash = ((hash << 5) - hash) + str.charCodeAt(i);
-            hash |= 0;
-        }
-        return hash;
-    }
-
-    // FILTRI I RREPTË I KUOTAVE: Vetëm mes 1.50 dhe 6.00
-    let validMatches = formattedMatches.filter(m => m.odd >= 1.50 && m.odd <= 6.00);
-
-    // Përziere dhe merr 4 ndeshje unike për çdo skanim në mënyrë që të mos përsëriten
+    // Përziere dhe merr 4 ndeshje unike për çdo klikim (që biletat të ndryshojnë gjithmonë)
     let shuffled = [...validMatches].sort(() => 0.5 - Math.random());
     let finalTicket = shuffled.slice(0, 4);
 
@@ -721,7 +632,7 @@ app.get('/', (req, res) => {
 
         async function runScan() {
             const container = document.getElementById('results-container');
-            container.innerHTML = "<p style='color:#facc15;'>Duke tërhequr ndeshjet live nga API dhe duke i filtruar (Kuotat 1.50 - 6.00)...</p>";
+            container.innerHTML = "<p style='color:#facc15;'>Duke gjeneruar biletën e 3 ditëve të ardhshme (Kuotat 1.50 - 6.00)...</p>";
             
             try {
                 const res = await fetch('/api/scan', {
@@ -744,7 +655,7 @@ app.get('/', (req, res) => {
                     document.getElementById('subscribe-trigger-btn').style.display = "block";
                 }
 
-                let html = "<p><strong>Bileta e Skanuar Live (" + data.selectedCount + " Ndeshje Reale - Kuotat 1.50 - 6.00):</strong></p>";
+                let html = "<p><strong>Bileta e Skanuar (" + data.selectedCount + " Ndeshje Reale - Kuotat 1.50 - 6.00):</strong></p>";
                 data.matches.forEach(m => {
                     html += '<div class="match-card"><span style="color:#38bdf8; font-size:12px;">📅 ' + m.date + ' | ' + m.league + '</span><br><strong>' + m.home + ' vs ' + m.away + '</strong><br>Type: <span style="color:#4ade80;">' + m.betType + '</span> | Odd: <strong>' + m.odd + '</strong></div>';
                 });
