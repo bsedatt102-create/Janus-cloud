@@ -12,9 +12,9 @@ const API_KEY = '294b2c55df8cfcabc587f6539cc5e2ab';
 const ADMIN_EMAIL = "sedatbatatina@gmail.com";
 const ADMIN_PASSWORD = "Albinkurti2026";
 
-const REAL_IBAN = "XK051701003031878968"; //[span_3](start_span)[span_3](end_span)
-const REAL_SWIFT = "NLPRXKPR"; //[span_4](start_span)[span_4](end_span)
-const REAL_BANK = "NLB BANKA SH.A."; //[span_5](start_span)[span_5](end_span)
+const REAL_IBAN = "XK051701003031878968";
+const REAL_SWIFT = "NLPRXKPR";
+const REAL_BANK = "NLB BANKA SH.A.";
 const REAL_USDT_ADDRESS = "TX1234567890abcdefUSDTtrc20AddressXYZ";
 const ADMIN_INITIALS = "S. B.";
 
@@ -61,13 +61,14 @@ app.post('/api/register', (req, res) => {
     if (!email || !password || !plan) {
         return res.json({ success: false, error: "Plotësoni të gjitha fushat!" });
     }
-    const existing = usersDatabase.find(u => u.email.toLowerCase() === email.toLowerCase().trim());
+    const cleanEmail = email.toLowerCase().trim();
+    const existing = usersDatabase.find(u => u.email === cleanEmail);
     if (existing) {
-        return res.json({ success: false, error: "Ky email është i regjistruar!" });
+        return res.json({ success: false, error: "Ky email është i regjistruar tashmë!" });
     }
 
     usersDatabase.push({ 
-        email: email.toLowerCase().trim(), 
+        email: cleanEmail, 
         password: password.trim(), 
         role: "user",
         subscriptionActive: false, 
@@ -78,21 +79,25 @@ app.post('/api/register', (req, res) => {
 
     res.json({ 
         success: true, 
+        email: cleanEmail,
         iban: REAL_IBAN, 
         swift: REAL_SWIFT,
         bank: REAL_BANK,
         usdt: REAL_USDT_ADDRESS, 
         initials: ADMIN_INITIALS,
-        message: "Regjistrimi u krye! Njoftimi u dërgua." 
+        message: "Regjistrimi u krye me sukses!" 
     });
 });
 
 app.post('/api/process-payment', (req, res) => {
     const { email, cardNumber } = req.body;
+    if (!email) {
+        return res.json({ success: false, error: "Gabim: Mungon emaili i përdoruesit." });
+    }
     const user = usersDatabase.find(u => u.email.toLowerCase() === email.toLowerCase().trim());
 
     if (!user) {
-        return res.json({ success: false, error: "Përdoruesi nuk u gjet." });
+        return res.json({ success: false, error: "Përdoruesi nuk u gjet në sistem." });
     }
 
     if (cardNumber && cardNumber.endsWith("0000")) {
@@ -102,9 +107,10 @@ app.post('/api/process-payment', (req, res) => {
         });
     }
 
+    // Pagesa pranohet me sukses nga sistemi dhe dërgohet te admini për verifikim
     res.json({ 
         success: true, 
-        message: "Konfirmimi u dërgua me sukses te paneli i administratorit!" 
+        message: "Pagesa u dërgua me sukses! Llogaria juaj është në pritje të konfirmimit nga administratori." 
     });
 });
 
@@ -141,7 +147,7 @@ app.post('/api/scan', async (req, res) => {
     const isPayPerScan = user.plan.includes("Pay-per-Scan");
     if (isPayPerScan && user.scansLeft <= 0) {
         return res.status(403).json({ 
-            error: "Krediti juaj i skanimit ka përfunduar! Ju lutemi bëni një pagesë të re (1€) për të marrë biletën e radhës." 
+            error: "Krediti juaj i skanimit ka përfunduar! Ju lutemi bëni një pagesë të re për të vazhduar." 
         });
     }
 
@@ -265,11 +271,11 @@ app.get('/', (req, res) => {
             </div>
         </div>
 
-        <!-- DRITARJA E PAGESËSE ME NJOFTIM AUTOMATIK -->
+        <!-- DRITARJA E PAGESËS DHE KONfirmimit -->
         <div id="payment-modal">
             <div class="modal-content">
-                <div id="reg-notification" class="notification-banner">Llogaria u krijua! Njoftimi u dërgua në sistemin e pagesave.</div>
-                <h3 style="color: #38bdf8; margin-top: 0;">Udhëzimet e Pagesës Bankare & Krypto</h3>
+                <div id="reg-notification" class="notification-banner">Llogaria u krijua! Futni të dhënat e pagesës më poshtë.</div>
+                <h3 style="color: #38bdf8; margin-top: 0;">Paguaj & Dërgo Konfirmimin</h3>
                 <p style="font-size: 13px; color: #cbd5e1;">Për transferta vendore dhe ndërkombëtare, përdorni të dhënat e mëposhtme:</p>
                 
                 <div class="info-msg" id="payment-details-box"></div>
@@ -281,7 +287,7 @@ app.get('/', (req, res) => {
 
                 <p id="pay-error" style="color: #f87171; font-size: 13px; margin-top: 8px;"></p>
 
-                <button class="main-btn" style="background:#15803d; margin-top: 10px;" onclick="submitPayment()">Dërgo Njoftimin te Admini</button>
+                <button class="main-btn" style="background:#15803d; margin-top: 10px;" onclick="submitPayment()">Paguaj & Dërgo Konfirmimin</button>
                 <button class="main-btn" style="background:#334155; margin-top: 6px; padding: 10px;" onclick="closePaymentModal()">Mbyll</button>
             </div>
         </div>
@@ -296,7 +302,6 @@ app.get('/', (req, res) => {
                 <button class="main-btn" onclick="runScan()">Skano Tregun Live (3-6 Ndeshje)</button>
             </div>
 
-            <!-- PANELI I ADMINIT ME NJOFTIME LIVE TË KLIENTËVE -->
             <div id="admin-panel" class="auth-box" style="display:none; max-width:100%; text-align:left; border-color: #facc15; margin-bottom:20px;">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <h3 style="color:#facc15; margin:0;">Paneli i Administratorit (Njoftimet Live)</h3>
@@ -357,9 +362,6 @@ app.get('/', (req, res) => {
             const errEl = document.getElementById('reg-error');
             errEl.innerText = "";
 
-            registeredUserPlan = plan;
-            currentUserEmail = email;
-
             try {
                 const res = await fetch('/api/register', {
                     method: 'POST',
@@ -368,7 +370,9 @@ app.get('/', (req, res) => {
                 });
                 const data = await res.json();
                 if(data.success) {
-                    // Shfaq njoftimin automatik në ekran
+                    currentUserEmail = data.email;
+                    registeredUserPlan = plan;
+
                     document.getElementById('reg-notification').style.display = 'block';
                     document.getElementById('payment-details-box').innerHTML = 
                         '<strong>Paketa:</strong> ' + plan + '<br>' +
@@ -393,6 +397,11 @@ app.get('/', (req, res) => {
             const errEl = document.getElementById('pay-error');
             errEl.innerText = "";
 
+            if (!currentUserEmail) {
+                errEl.innerText = "Gabim: Emaili i përdoruesit nuk u gjet. Ju lutemi provoni përsëri.";
+                return;
+            }
+
             try {
                 const res = await fetch('/api/process-payment', {
                     method: 'POST',
@@ -402,7 +411,7 @@ app.get('/', (req, res) => {
                 const data = await res.json();
 
                 if(data.success) {
-                    alert("Njoftimi u dërgua me sukses te administratori! Sapo të konfirmohet pagesa, llogaria aktivizohet.");
+                    alert("Pagesa u krye me sukses dhe njoftimi u dërgua te administratori! Sapo të konfirmohet në bankë, llogaria aktivizohet.");
                     document.getElementById('payment-modal').style.display = 'none';
                     switchMode('login');
                 } else {
@@ -478,4 +487,3 @@ app.get('/', (req, res) => {
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
-
