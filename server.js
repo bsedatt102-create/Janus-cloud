@@ -8,8 +8,8 @@ const API_KEY = '294b2c55df8cfcabc587f6539cc5e2ab';
 // ==========================================================
 // TË DHËNAT E ADMINISTRATORIT
 // ==========================================================
-const ADMIN_EMAIL = "sedat@admin.com";
-const ADMIN_PASSWORD = "adminpassword";
+const ADMIN_EMAIL = "sedatbatatina@gmail.com";
+const ADMIN_PASSWORD = "Albinkirti2026";
 
 let usersDatabase = [
     { 
