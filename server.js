@@ -22,11 +22,24 @@ let usersDatabase = [
         subscriptionActive: true, 
         plan: "Admin Master",
         freeScansLeft: 999,
-        scansLeft: 999 
+        scansLeft: 999,
+        expiryDate: null,
+        ip: "admin-ip"
     }
 ];
 
 let performanceStats = { totalScans: 0, successHits: 0, accuracyRate: 95 };
+
+// Funksioni për të kontrolluar skadimin e abonimit
+function checkSubscriptionExpiry(user) {
+    if (user.subscriptionActive && user. expiryDate) {
+        if (new Date() > new Date(user.expiryDate)) {
+            user.subscriptionActive = false;
+            user.freeScansLeft = 0;
+            user.plan = "Skaduar / Expired";
+        }
+    }
+}
 
 app.post('/api/login', (req, res) => {
     const { username, password } = req.body;
@@ -36,6 +49,8 @@ app.post('/api/login', (req, res) => {
     if (!user) {
         return res.json({ success: false, error: "Emri ose fjalëkalimi i gabuar! / Wrong username or password!" });
     }
+
+    checkSubscriptionExpiry(user);
 
     res.json({ 
         success: true, 
@@ -50,6 +65,8 @@ app.post('/api/login', (req, res) => {
 
 app.post('/api/register', (req, res) => {
     const { username, password } = req.body;
+    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+
     if (!username || !password) {
         return res.json({ success: false, error: "Plotësoni të gjitha fushat! / Fill all fields!" });
     }
@@ -59,14 +76,22 @@ app.post('/api/register', (req, res) => {
         return res.json({ success: false, error: "Ky emër është i zënë! / Username already taken!" });
     }
 
+    // Kontrollon nëse kjo IP ka krijuar tashmë llogari falas më parë
+    const existingIpUser = usersDatabase.find(u => u.ip === clientIp && u.role !== 'admin');
+    let freeScans = 3;
+    if (existingIpUser) {
+        freeScans = 0; // Nuk merr më skanime falas nëse ka tentuar të hapë shumë llogari nga e njëjta pajisje
+    }
+
     usersDatabase.push({ 
         username: cleanUser, 
         password: password.trim(), 
         role: "user",
         subscriptionActive: false, 
-        freeScansLeft: 3, 
-        plan: "Falas (3 Skanime)",
-        registeredAt: new Date().toLocaleTimeString('sq-AL', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
+        freeScansLeft: freeScans, 
+        plan: freeScans > 0 ? "Falas (3 Skanime)" : "Kërkon Abonim",
+        registeredAt: new Date().toLocaleTimeString('sq-AL', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }),
+        ip: clientIp
     });
 
     res.json({ 
@@ -102,14 +127,17 @@ app.post('/api/process-payment', (req, res) => {
 });
 
 app.get('/api/admin/users', (req, res) => {
-    const list = usersDatabase.filter(u => u.role !== 'admin').map(u => ({
-        username: u.username,
-        plan: u.plan,
-        active: u.subscriptionActive,
-        freeScansLeft: u.freeScansLeft,
-        txid: u.lastTxid || "-",
-        registeredAt: u.registeredAt
-    }));
+    const list = usersDatabase.filter(u => u.role !== 'admin').map(u => {
+        checkSubscriptionExpiry(u);
+        return {
+            username: u.username,
+            plan: u.plan,
+            active: u.subscriptionActive,
+            freeScansLeft: u.freeScansLeft,
+            txid: u.lastTxid || "-",
+            registeredAt: u.registeredAt
+        };
+    });
     res.json({ users: list });
 });
 
@@ -122,6 +150,16 @@ app.post('/api/admin/activate', (req, res) => {
     if (target) {
         target.subscriptionActive = true;
         target.freeScansLeft = 999;
+
+        // Llogaritja automatike e skadimit në bazë të planit
+        let daysToAdd = 30; // Parazgjedhje 1 muaj
+        if (target.plan.includes("3 Muaj")) daysToAdd = 90;
+        if (target.plan.includes("1 Vit")) daysToAdd = 365;
+
+        let expiry = new Date();
+        expiry.setDate(expiry.getDate() + daysToAdd);
+        target.expiryDate = expiry;
+
         return res.json({ success: true });
     }
     res.json({ success: false });
@@ -132,9 +170,11 @@ app.post('/api/scan', async (req, res) => {
     const user = usersDatabase.find(u => u.username === username);
     if (!user) return res.status(403).json({ error: "Përdoruesi nuk u gjet." });
 
+    checkSubscriptionExpiry(user);
+
     if (!user.subscriptionActive && user.freeScansLeft <= 0) {
         return res.status(403).json({ 
-            error: "Keni shfrytëzuar të 3 skanimet falas! / Free scans ended!",
+            error: "Keni shfrytëzuar skanimet falas ose abonimi ka skaduar! / Free scans ended or subscription expired!",
             needsSubscription: true
         });
     }
