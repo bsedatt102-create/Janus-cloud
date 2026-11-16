@@ -25,7 +25,6 @@ let usersDatabase = [
 
 let performanceStats = { totalScans: 0, successHits: 0, accuracyRate: 85 };
 
-// API PËR LOGIN DIRECT
 app.post('/api/login', (req, res) => {
     const { email, password } = req.body;
     const user = usersDatabase.find(u => u.email.toLowerCase() === email.toLowerCase().trim() && u.password === password.trim());
@@ -65,7 +64,7 @@ app.post('/api/register', (req, res) => {
         email: email.toLowerCase().trim(), 
         password: password.trim(), 
         role: "user",
-        subscriptionActive: false, 
+        subscriptionActive: false, // Pret adminin
         plan,
         scansLeft: 0,
         registeredAt: new Date().toLocaleString()
@@ -93,49 +92,79 @@ app.post('/api/admin/activate', (req, res) => {
     const target = usersDatabase.find(u => u.email === targetEmail);
     if (target) {
         target.subscriptionActive = true;
+        // Nëse është Pay-per-Scan, i jepet fiks 1 skanim. Nëse është abonim, i jepet qasje e pakufizuar (999)
         target.scansLeft = target.plan.includes("Pay-per-Scan") ? 1 : 999;
         return res.json({ success: true });
     }
     res.json({ success: false });
 });
 
+// SKANIMI DHE KONTROLLI I KREDITIT (3-6 LOJËRA)
 app.post('/api/scan', async (req, res) => {
     const { userEmail } = req.body;
     const user = usersDatabase.find(u => u.email === userEmail);
-    if (!user || !user.subscriptionActive) return res.status(403).json({ error: "Qasja e paautorizuar." });
+    if (!user || !user.subscriptionActive) return res.status(403).json({ error: "Qasja e paautorizuar ose llogaria jo-aktive." });
+
+    const isPayPerScan = user.plan.includes("Pay-per-Scan");
+    if (isPayPerScan && user.scansLeft <= 0) {
+        return res.status(403).json({ 
+            error: "Krediti juaj i skanimit ka përfunduar! Për të krijuar një biletë të re, ju lutemi bëni pagesën e radhës (1€) dhe njoftoni administratorin." 
+        });
+    }
 
     try {
         const response = await fetch(`https://api.the-odds-api.com/v4/sports/soccer/odds/?apiKey=${API_KEY}&regions=eu&markets=totals,h2h&oddsFormat=decimal`);
-        if (!response.ok) return res.status(500).json({ error: "Gabim në lidhje me kuotat." });
+        if (!response.ok) return res.status(500).json({ error: "Gabim në lidhje me kuotat live." });
 
         const matches = await response.json();
         let qualifiedMatches = [];
-        const trustedLeagues = ['Premier League', 'La Liga', 'Serie A', 'Bundesliga', 'Ligue 1'];
+        const trustedLeagues = ['Premier League', 'La Liga', 'Serie A', 'Bundesliga', 'Ligue 1', 'Eredivisie'];
 
         for (const match of matches) {
             if (!match.bookmakers || match.bookmakers.length === 0) continue;
-            if (!trustedLeagues.some(l => (match.sport_title || "").includes(l))) continue;
+            const leagueTitle = match.sport_title || "";
+            if (!trustedLeagues.some(l => leagueTitle.includes(l))) continue;
 
             qualifiedMatches.push({
-                league: match.sport_title,
+                league: leagueTitle,
                 home: match.home_team,
                 away: match.away_team,
                 time: new Date(match.commence_time).toLocaleTimeString('sq-AL', { hour: '2-digit', minute: '2-digit' }),
                 odd: "1.85",
                 betType: "Mbi 2.5 Gola (Over 2.5)",
                 tableStatus: "Smart Multi-Market Verifikuar",
-                safetyScore: 90
+                safetyScore: 91
             });
+        }
+
+        // Përzgjedhja nga 3 deri në 6 ndeshje
+        const finalSelection = qualifiedMatches.slice(0, 5);
+
+        if (finalSelection.length < 3) {
+            return res.json({
+                status: "HOLD",
+                message: "Tregu sot ka rrezik (më pak se 3 ndeshje të pastra). Krediti juaj NUK u shpenzua.",
+                matches: []
+            });
+        }
+
+        // Nëse është Pay-per-Scan, zbritet krediti menjëherë pas gjenerimit të suksesshëm
+        if (isPayPerScan) {
+            user.scansLeft -= 1;
+            if (user.scansLeft <= 0) {
+                user.subscriptionActive = false; // Bllokohet deri në pagesën e ardhshme
+            }
         }
 
         res.json({
             status: "APPROVED",
-            selectedCount: Math.min(qualifiedMatches.length, 6),
+            selectedCount: finalSelection.length,
             accuracyRate: performanceStats.accuracyRate,
-            matches: qualifiedMatches.slice(0, 6)
+            scansLeft: user.scansLeft,
+            matches: finalSelection
         });
     } catch (err) {
-        res.status(500).json({ error: "Gabim serveri." });
+        res.status(500).json({ error: "Gabim serveri: " + err.message });
     }
 });
 
@@ -159,14 +188,16 @@ app.get('/', (req, res) => {
         .auth-box { max-width: 420px; margin: 25px auto; background: #0f172a; padding: 25px; border-radius: 10px; border: 1px solid #334155; text-align: center; }
         .auth-input, .auth-select { padding: 11px; width: 92%; border-radius: 6px; border: 1px solid #334155; background: #1e293b; color: #fff; text-align: center; font-size: 15px; margin-bottom: 12px; }
         .tab-link { color: #38bdf8; cursor: pointer; font-size: 13px; margin-top: 12px; display: inline-block; text-decoration: underline; }
-        .info-msg { background: #1e293b; border: 1px solid #38bdf8; padding: 12px; border-radius: 6px; font-size: 13px; color: #cbd5e1; margin-top: 12px; text-align: left; }
+        .info-msg { background: #1e293b; border: 1px solid #38bdf8; padding: 15px; border-radius: 8px; font-size: 13px; color: #cbd5e1; margin-top: 12px; text-align: left; line-height: 1.6; }
         #app-content { display: none; }
+        #payment-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-content { background: #1e293b; padding: 25px; border-radius: 12px; max-width: 450px; width: 90%; border: 1px solid #38bdf8; text-align: center; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header-flex">
-            <span style="font-size: 12px; color: #94a3b8;">Vers. 8.5 Fixed Click</span>
+            <span style="font-size: 12px; color: #94a3b8;">Vers. 8.7 Strict Credit & 3-6 Match Filter</span>
         </div>
 
         <div id="auth-screen">
@@ -187,14 +218,31 @@ app.get('/', (req, res) => {
                 <input type="email" id="reg-email" class="auth-input" placeholder="Email juaj...">
                 <input type="password" id="reg-password" class="auth-input" placeholder="Krijo fjalëkalimin...">
                 <select id="reg-plan" class="auth-select">
-                    <option value="Pay-per-Scan (€1)">1 Skanim - €1</option>
-                    <option value="1 Muaj (€5)">1 Muaj - €5</option>
-                    <option value="1 Vit (€40)">1 Vit - €40</option>
+                    <option value="Pay-per-Scan (€1)">1 Skanim (3-6 Lojëra) - €1</option>
+                    <option value="1 Muaj (€5)">1 Muaj Abonim - €5</option>
+                    <option value="3 Muaj (€12)">3 Muaj Abonim - €12</option>
+                    <option value="1 Vit (€40)">1 Vit Abonim - €40</option>
                 </select>
-                <button class="main-btn" style="background:#15803d;" onclick="handleRegister()">Regjistrohu</button>
+                <button class="main-btn" style="background:#15803d;" onclick="handleRegister()">Vazhdo te Pagesa</button>
                 <p id="reg-error" style="color: #f87171; font-size: 13px; margin-top: 10px;"></p>
-                <div id="register-msg-box"></div>
                 <span class="tab-link" onclick="switchMode('login')">Je regjistruar? Hyr këtu</span>
+            </div>
+        </div>
+
+        <!-- DRITARJA E PAGESËS PRIVATE -->
+        <div id="payment-modal">
+            <div class="modal-content">
+                <h3 style="color: #38bdf8; margin-top: 0;">Udhëzimet e Pagesës Private</h3>
+                <p style="font-size: 13px; color: #cbd5e1;">Llogaria juaj u krijua! Për të aktivizuar paketën tuaj, kryeni pagesën:</p>
+                <div class="info-msg">
+                    <strong>1. Transfertë Bankare (IBAN):</strong><br>
+                    IBAN: <span style="color: #4ade80;">XK05 1234 5678 9012 3456</span><br>
+                    Përfituesi: Sedat Batatina<br><br>
+                    <strong>2. Pagesë Krypto (USDT - TRC20):</strong><br>
+                    Adresa: <span style="color: #facc15; font-size: 11px;">TXxx...KryptoAdresaVete12345</span>
+                </div>
+                <p style="font-size: 12px; color: #94a3b8; margin-top: 15px;">Pasi të kryeni pagesën, administratori do ta aktivizojë llogarinë tuaj.</p>
+                <button class="main-btn" onclick="closePaymentModal()">Kuptova, Shko te Hyrja</button>
             </div>
         </div>
 
@@ -205,7 +253,7 @@ app.get('/', (req, res) => {
             <div class="status-box">
                 <div>Statusi: <span id="system-status" class="approved">GATI</span></div>
                 <p style="font-size: 13px; color: #94a3b8; margin: 8px 0;">Paketa: <strong id="user-plan-display" style="color:#38bdf8;">-</strong></p>
-                <button class="main-btn" onclick="runScan()">Skano Tregun Live</button>
+                <button class="main-btn" onclick="runScan()">Skano Tregun Live (3-6 Lojëra)</button>
             </div>
 
             <div id="admin-panel" class="auth-box" style="display:none; max-width:100%; text-align:left; border-color: #facc15; margin-bottom:20px;">
@@ -261,7 +309,6 @@ app.get('/', (req, res) => {
             const password = document.getElementById('reg-password').value;
             const plan = document.getElementById('reg-plan').value;
             const errEl = document.getElementById('reg-error');
-            const msgBox = document.getElementById('register-msg-box');
             errEl.innerText = "";
 
             try {
@@ -272,13 +319,18 @@ app.get('/', (req, res) => {
                 });
                 const data = await res.json();
                 if(data.success) {
-                    msgBox.innerHTML = '<div class="info-msg">✓ Llogaria u regjistrua! Administratori do ta aktivizojë së shpejti.</div>';
+                    document.getElementById('payment-modal').style.display = 'flex';
                 } else {
                     errEl.innerText = data.error;
                 }
             } catch(e) {
                 errEl.innerText = "Gabim në lidhje.";
             }
+        }
+
+        function closePaymentModal() {
+            document.getElementById('payment-modal').style.display = 'none';
+            switchMode('login');
         }
 
         async function loadAdminUsers() {
@@ -309,22 +361,29 @@ app.get('/', (req, res) => {
 
         async function runScan() {
             const container = document.getElementById('results-container');
-            container.innerHTML = "<p style='color:#facc15;'>Duke skanuar tregjet...</p>";
-            const res = await fetch('/api/scan', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userEmail: currentUserEmail })
-            });
-            const data = await res.json();
-            if(data.error) {
-                container.innerHTML = '<p style="color:#f87171;">' + data.error + '</p>';
-                return;
+            container.innerHTML = "<p style='color:#facc15;'>Duke skanuar tregjet (3-6 ndeshje)...</p>";
+            
+            try {
+                const res = await fetch('/api/scan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userEmail: currentUserEmail })
+                });
+                const data = await res.json();
+                
+                if(data.error) {
+                    container.innerHTML = '<p style="color:#f87171; font-weight:bold;">' + data.error + '</p>';
+                    return;
+                }
+                
+                let html = "<p><strong>Bileta e Përzgjedhur (" + data.selectedCount + " Ndeshje):</strong></p>";
+                data.matches.forEach(m => {
+                    html += '<div class="match-card"><span style="color:#94a3b8; font-size:12px;">' + m.league + ' - ' + m.time + '</span><br><strong>' + m.home + ' vs ' + m.away + '</strong><br>Lloji: <span style="color:#38bdf8;">' + m.betType + '</span> | Kuota: ' + m.odd + '</div>';
+                });
+                container.innerHTML = html;
+            } catch(e) {
+                container.innerHTML = '<p style="color:#f87171;">Gabim në komunikim me serverin.</p>';
             }
-            let html = "<p><strong>Gjetje:</strong></p>";
-            data.matches.forEach(m => {
-                html += '<div class="match-card"><strong>' + m.home + ' vs ' + m.away + '</strong><br>Lloji: ' + m.betType + ' | Kuota: ' + m.odd + '</div>';
-            });
-            container.innerHTML = html;
         }
     </script>
 </body>
@@ -334,4 +393,5 @@ app.get('/', (req, res) => {
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
+
 
