@@ -172,13 +172,14 @@ app.post('/api/scan', async (req, res) => {
             matches: finalTicket
         });
 
-    } catch (err) {
+        } catch (err) {
         res.status(502).json({
             error: 'SOFASCORE_UNAVAILABLE',
-            message: err instanceof SofascoreError ? err.message : 'Gabim i brendshëm',
+            message: err.message || 'Gabim i brendshëm',
             matches: [],
         });
     }
+
 });
 
 app.get('/', (req, res) => {
