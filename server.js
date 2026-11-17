@@ -38,9 +38,39 @@ function checkSubscriptionExpiry(user) {
 
 app.post('/api/login', (req, res) => {
     const { username, password } = req.body;
+    if (!username || !password) {
+        return res.json({ success: false, error: "Plotësoni të gjitha fushat!" });
+    }
+
     const cleanUser = username.toLowerCase().trim();
-    const user = usersDatabase.find(u => u.username.toLowerCase() === cleanUser && u.password === password.trim());
-    
+    const cleanPass = password.trim();
+
+    // Sigurimi direkt i hyrjes për Adminin
+    if (cleanUser === ADMIN_USER.toLowerCase() && cleanPass === ADMIN_PASSWORD) {
+        let adminObj = usersDatabase.find(u => u.username.toLowerCase() === ADMIN_USER);
+        if (!adminObj) {
+            adminObj = { 
+                username: ADMIN_USER, 
+                password: ADMIN_PASSWORD, 
+                role: "admin", 
+                subscriptionActive: true, 
+                plan: "Admin Master", 
+                freeScansLeft: 999 
+            };
+            usersDatabase.push(adminObj);
+        }
+        return res.json({ 
+            success: true, 
+            username: ADMIN_USER, 
+            role: "admin",
+            plan: "Admin Master",
+            freeScansLeft: 999,
+            subscriptionActive: true,
+            needsSubscription: false
+        });
+    }
+
+    const user = usersDatabase.find(u => u.username.toLowerCase() === cleanUser && u.password === cleanPass);
     if (!user) {
         return res.json({ success: false, error: "Emri ose fjalëkalimi i gabuar! / Wrong username or password!" });
     }
@@ -66,6 +96,10 @@ app.post('/api/register', (req, res) => {
         return res.json({ success: false, error: "Plotësoni të gjitha fushat! / Fill all fields!" });
     }
     const cleanUser = username.toLowerCase().trim();
+    if (cleanUser === ADMIN_USER.toLowerCase()) {
+        return res.json({ success: false, error: "Ky emër është i rezervuar!" });
+    }
+
     const existing = usersDatabase.find(u => u.username === cleanUser);
     if (existing) {
         return res.json({ success: false, error: "Ky emër është i zënë! / Username already taken!" });
@@ -137,10 +171,10 @@ app.get('/api/admin/users', (req, res) => {
 
 app.post('/api/admin/activate', (req, res) => {
     const { adminUser, targetUser } = req.body;
-    const admin = usersDatabase.find(u => u.username === adminUser && u.role === 'admin');
-    if (!admin) return res.status(403).json({ success: false });
+    const admin = usersDatabase.find(u => u.username.toLowerCase() === (adminUser || "").toLowerCase() && u.role === 'admin');
+    if (!admin && adminUser !== ADMIN_USER) return res.status(403).json({ success: false });
 
-    const target = usersDatabase.find(u => u.username === targetUser);
+    const target = usersDatabase.find(u => u.username.toLowerCase() === (targetUser || "").toLowerCase());
     if (target) {
         target.subscriptionActive = true;
         target.freeScansLeft = 999;
@@ -160,19 +194,19 @@ app.post('/api/admin/activate', (req, res) => {
 
 app.post('/api/scan', async (req, res) => {
     const { username } = req.body;
-    const user = usersDatabase.find(u => u.username === username);
-    if (!user) return res.status(403).json({ error: "Përdoruesi nuk u gjet." });
+    const user = usersDatabase.find(u => u.username.toLowerCase() === (username || "").toLowerCase());
+    if (!user && username !== ADMIN_USER) return res.status(403).json({ error: "Përdoruesi nuk u gjet." });
 
-    checkSubscriptionExpiry(user);
-
-    if (!user.subscriptionActive && user.freeScansLeft <= 0) {
-        return res.status(403).json({ 
-            error: "Keni shfrytëzuar skanimet falas ose abonimi ka skaduar! / Free scans ended or subscription expired!",
-            needsSubscription: true
-        });
+    if (user && user.role !== 'admin') {
+        checkSubscriptionExpiry(user);
+        if (!user.subscriptionActive && user.freeScansLeft <= 0) {
+            return res.status(403).json({ 
+                error: "Keni shfrytëzuar skanimet falas ose abonimi ka skaduar! / Free scans ended or subscription expired!",
+                needsSubscription: true
+            });
+        }
     }
 
-    // Llogaritja e datave të sakta për 3 ditët e ardhshme në kohë reale
     const today = new Date();
     const d0 = new Date(today);
     const d1 = new Date(today); d1.setDate(today.getDate() + 1);
@@ -184,9 +218,7 @@ app.post('/api/scan', async (req, res) => {
     const nDay = fmt(d1);
     const pDay = fmt(d2);
 
-    // Baza e madhe e të dhënave nga disa burime (Multi-Bookmakers) me statistika të plota
     const multiBookmakerPool = [
-        // SOT
         { 
             source: "Bookmaker A", league: "Premier League (Angli)", date: "Sot (" + sDay + "), 20:30", 
             home: "Brentford", away: "Newcastle", odd: 1.78, betType: "Mbi 2.5 Gola",
@@ -215,8 +247,6 @@ app.post('/api/scan', async (req, res) => {
             homeStats: "Sulm shumë i fuqishëm", awayStats: "Dobët në mbrojtje jashtë",
             winProb: "Nikoqiri 55% | Barazim 25% | Mysafiri 20%"
         },
-
-        // NESËR
         { 
             source: "Bookmaker B", league: "Serie A (Itali)", date: "Nesër (" + nDay + "), 18:30", 
             home: "Empoli", away: "Verona", odd: 1.75, betType: "1X (Nikoqiri ose Barazim)",
@@ -245,8 +275,6 @@ app.post('/api/scan', async (req, res) => {
             homeStats: "Agresiv në shtëpi", awayStats: "Sulm efikas në kundërsulm",
             winProb: "Nikoqiri 44% | Barazim 31% | Mysafiri 25%"
         },
-
-        // PASNESËR
         { 
             source: "Bookmaker C", league: "Champions League", date: "Pasnesër (" + pDay + "), 21:00", 
             home: "Arsenal", away: "Bayern Munich", odd: 1.88, betType: "Mbi 2.5 Gola",
@@ -277,19 +305,20 @@ app.post('/api/scan', async (req, res) => {
         }
     ];
 
-    // Algoritmi i përzierjes unike (Anti-Repetition Shuffler) që garanton bileta të ndryshme në çdo klikim
     let shuffled = [...multiBookmakerPool].sort(() => 0.5 - Math.random());
     let finalTicket = shuffled.slice(0, 4);
 
-    if (!user.subscriptionActive) {
+    if (user && user.role !== 'admin' && !user.subscriptionActive) {
         user.freeScansLeft -= 1;
     }
+
+    let remainingScans = user && user.role === 'admin' ? 999 : (user ? user.freeScansLeft : 0);
 
     res.json({
         status: "APPROVED",
         selectedCount: finalTicket.length,
-        freeScansLeft: user.freeScansLeft,
-        subscriptionActive: user.subscriptionActive,
+        freeScansLeft: remainingScans,
+        subscriptionActive: user ? user.subscriptionActive : true,
         accuracyRate: performanceStats.accuracyRate,
         matches: finalTicket
     });
@@ -661,8 +690,8 @@ app.get('/', (req, res) => {
             const scansEl = document.getElementById('free-scans-display');
             const subBtn = document.getElementById('subscribe-trigger-btn');
 
-            if (data.subscriptionActive) {
-                statusEl.innerText = "ABONIM I PAKUFIZUAR / UNLIMITED";
+            if (data.role === 'admin' || data.subscriptionActive) {
+                statusEl.innerText = data.role === 'admin' ? "ADMIN MASTER" : "ABONIM I PAKUFIZUAR / UNLIMITED";
                 statusEl.style.color = "#4ade80";
                 scansEl.innerText = "Unlimited";
                 subBtn.style.display = "none";
