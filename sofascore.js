@@ -1,7 +1,8 @@
 'use strict';
 
-const RAPIDAPI_HOST = 'sofascore.p.rapidapi.com';
+const RAPIDAPI_HOST = 'sofascore6.p.rapidapi.com';
 const BASE_URL = `https://${RAPIDAPI_HOST}`;
+
 
 const MAIN_LEAGUES = new Map([
   [17,    'Premier League'],
