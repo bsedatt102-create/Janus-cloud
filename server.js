@@ -26,16 +26,6 @@ let usersDatabase = [
 
 let performanceStats = { totalScans: 0, successHits: 0, accuracyRate: 95 };
 
-function checkSubscriptionExpiry(user) {
-    if (user.subscriptionActive && user.expiryDate) {
-        if (new Date() > new Date(user.expiryDate)) {
-            user.subscriptionActive = false;
-            user.freeScansLeft = 0;
-            user.plan = "Skaduar / Expired";
-        }
-    }
-}
-
 app.post('/api/login', (req, res) => {
     const { username, password } = req.body;
     if (!username || !password) {
@@ -45,20 +35,8 @@ app.post('/api/login', (req, res) => {
     const cleanUser = username.toLowerCase().trim();
     const cleanPass = password.trim();
 
-    // Sigurimi direkt i hyrjes për Adminin
-    if (cleanUser === ADMIN_USER.toLowerCase() && cleanPass === ADMIN_PASSWORD) {
-        let adminObj = usersDatabase.find(u => u.username.toLowerCase() === ADMIN_USER);
-        if (!adminObj) {
-            adminObj = { 
-                username: ADMIN_USER, 
-                password: ADMIN_PASSWORD, 
-                role: "admin", 
-                subscriptionActive: true, 
-                plan: "Admin Master", 
-                freeScansLeft: 999 
-            };
-            usersDatabase.push(adminObj);
-        }
+    // ANASHKALIM DIREKT I SIGURT PËR ADMININ
+    if (cleanUser === ADMIN_USER && cleanPass === ADMIN_PASSWORD) {
         return res.json({ 
             success: true, 
             username: ADMIN_USER, 
@@ -74,8 +52,6 @@ app.post('/api/login', (req, res) => {
     if (!user) {
         return res.json({ success: false, error: "Emri ose fjalëkalimi i gabuar! / Wrong username or password!" });
     }
-
-    checkSubscriptionExpiry(user);
 
     res.json({ 
         success: true, 
@@ -93,22 +69,16 @@ app.post('/api/register', (req, res) => {
     const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
     if (!username || !password) {
-        return res.json({ success: false, error: "Plotësoni të gjitha fushat! / Fill all fields!" });
+        return res.json({ success: false, error: "Plotësoni të gjitha fushat!" });
     }
     const cleanUser = username.toLowerCase().trim();
-    if (cleanUser === ADMIN_USER.toLowerCase()) {
+    if (cleanUser === ADMIN_USER) {
         return res.json({ success: false, error: "Ky emër është i rezervuar!" });
     }
 
     const existing = usersDatabase.find(u => u.username === cleanUser);
     if (existing) {
-        return res.json({ success: false, error: "Ky emër është i zënë! / Username already taken!" });
-    }
-
-    const existingIpUser = usersDatabase.find(u => u.ip === clientIp && u.role !== 'admin');
-    let freeScans = 3;
-    if (existingIpUser) {
-        freeScans = 0; 
+        return res.json({ success: false, error: "Ky emër është i zënë!" });
     }
 
     usersDatabase.push({ 
@@ -116,8 +86,8 @@ app.post('/api/register', (req, res) => {
         password: password.trim(), 
         role: "user",
         subscriptionActive: false, 
-        freeScansLeft: freeScans, 
-        plan: freeScans > 0 ? "Falas (3 Skanime)" : "Kërkon Abonim",
+        freeScansLeft: 3, 
+        plan: "Falas (3 Skanime)",
         registeredAt: new Date().toLocaleTimeString('sq-AL', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }),
         ip: clientIp
     });
@@ -127,66 +97,42 @@ app.post('/api/register', (req, res) => {
         username: cleanUser,
         usdt: REAL_USDT_ADDRESS, 
         initials: ADMIN_INITIALS,
-        message: "Llogaria u krijua! / Account created!" 
+        message: "Llogaria u krijua!" 
     });
 });
 
 app.post('/api/process-payment', (req, res) => {
     const { username, txid, plan, amount } = req.body;
-    if (!username) {
-        return res.json({ success: false, error: "Gabim: Mungon përdoruesi." });
-    }
-    const user = usersDatabase.find(u => u.username.toLowerCase() === username.toLowerCase().trim());
+    const user = usersDatabase.find(u => u.username.toLowerCase() === (username || "").toLowerCase().trim());
+    if (!user) return res.json({ success: false, error: "Përdoruesi nuk u gjet." });
 
-    if (!user) {
-        return res.json({ success: false, error: "Përdoruesi nuk u gjet." });
-    }
-
-    if (plan) {
-        user.plan = plan + " (" + (amount || "5") + " USDT)";
-    }
-
+    if (plan) user.plan = plan + " (" + (amount || "5") + " USDT)";
     user.lastTxid = txid || "Konfirmim Manual";
 
-    res.json({ 
-        success: true, 
-        message: "Konfirmimi u dërgua! / Confirmation sent!" 
-    });
+    res.json({ success: true, message: "Konfirmimi u dërgua!" });
 });
 
 app.get('/api/admin/users', (req, res) => {
-    const list = usersDatabase.filter(u => u.role !== 'admin').map(u => {
-        checkSubscriptionExpiry(u);
-        return {
-            username: u.username,
-            plan: u.plan,
-            active: u.subscriptionActive,
-            freeScansLeft: u.freeScansLeft,
-            txid: u.lastTxid || "-",
-            registeredAt: u.registeredAt
-        };
-    });
+    const list = usersDatabase.filter(u => u.role !== 'admin').map(u => ({
+        username: u.username,
+        plan: u.plan,
+        active: u.subscriptionActive,
+        freeScansLeft: u.freeScansLeft,
+        txid: u.lastTxid || "-",
+        registeredAt: u.registeredAt
+    }));
     res.json({ users: list });
 });
 
 app.post('/api/admin/activate', (req, res) => {
-    const { adminUser, targetUser } = req.body;
-    const admin = usersDatabase.find(u => u.username.toLowerCase() === (adminUser || "").toLowerCase() && u.role === 'admin');
-    if (!admin && adminUser !== ADMIN_USER) return res.status(403).json({ success: false });
-
+    const { targetUser } = req.body;
     const target = usersDatabase.find(u => u.username.toLowerCase() === (targetUser || "").toLowerCase());
     if (target) {
         target.subscriptionActive = true;
         target.freeScansLeft = 999;
-
-        let daysToAdd = 30; 
-        if (target.plan.includes("3 Muaj")) daysToAdd = 90;
-        if (target.plan.includes("1 Vit")) daysToAdd = 365;
-
         let expiry = new Date();
-        expiry.setDate(expiry.getDate() + daysToAdd);
+        expiry.setDate(expiry.getDate() + 30);
         target.expiryDate = expiry;
-
         return res.json({ success: true });
     }
     res.json({ success: false });
@@ -195,130 +141,47 @@ app.post('/api/admin/activate', (req, res) => {
 app.post('/api/scan', async (req, res) => {
     const { username } = req.body;
     const user = usersDatabase.find(u => u.username.toLowerCase() === (username || "").toLowerCase());
-    if (!user && username !== ADMIN_USER) return res.status(403).json({ error: "Përdoruesi nuk u gjet." });
-
-    if (user && user.role !== 'admin') {
-        checkSubscriptionExpiry(user);
-        if (!user.subscriptionActive && user.freeScansLeft <= 0) {
-            return res.status(403).json({ 
-                error: "Keni shfrytëzuar skanimet falas ose abonimi ka skaduar! / Free scans ended or subscription expired!",
-                needsSubscription: true
-            });
-        }
+    
+    if (username !== ADMIN_USER && (!user || (!user.subscriptionActive && user.freeScansLeft <= 0))) {
+        return res.status(403).json({ 
+            error: "Keni shfrytëzuar skanimet falas ose abonimi ka skaduar!",
+            needsSubscription: true
+        });
     }
 
     const today = new Date();
     const d0 = new Date(today);
     const d1 = new Date(today); d1.setDate(today.getDate() + 1);
     const d2 = new Date(today); d2.setDate(today.getDate() + 2);
-
     const fmt = (d) => d.toLocaleDateString('sq-AL', { weekday: 'long', day: 'numeric', month: 'long' });
 
-    const sDay = fmt(d0);
-    const nDay = fmt(d1);
-    const pDay = fmt(d2);
-
     const multiBookmakerPool = [
-        { 
-            source: "Bookmaker A", league: "Premier League (Angli)", date: "Sot (" + sDay + "), 20:30", 
-            home: "Brentford", away: "Newcastle", odd: 1.78, betType: "Mbi 2.5 Gola",
-            homeForm: "F V H F B", awayForm: "V F V H V", 
-            homeStats: "Mes. 1.8 gola për ndeshje", awayStats: "Formë e shkëlqyer në transfertë",
-            winProb: "Nikoqiri 42% | Barazim 28% | Mysafiri 30%"
-        },
-        { 
-            source: "Bookmaker B", league: "La Liga (Spanjë)", date: "Sot (" + sDay + "), 21:00", 
-            home: "Rayo Vallecano", away: "Valencia", odd: 1.82, betType: "Të dyja shënojnë (GG)",
-            homeForm: "V B H V H", awayForm: "H V B F H", 
-            homeStats: "Shënon rregullisht në shtëpi", awayStats: "Vulnerabël në mbrojtje",
-            winProb: "Nikoqiri 45% | Barazim 30% | Mysafiri 25%"
-        },
-        { 
-            source: "Bookmaker C", league: "Serie A (Itali)", date: "Sot (" + sDay + "), 18:30", 
-            home: "Como", away: "Fiorentina", odd: 1.74, betType: "1X (Nikoqiri ose Barazim)",
-            homeForm: "V F B V F", awayForm: "H H V F B", 
-            homeStats: "Performancë solide në fushën e vet", awayStats: "Lë hapësira në mesfushë",
-            winProb: "Nikoqiri 40% | Barazim 35% | Mysafiri 25%"
-        },
-        { 
-            source: "Bookmaker A", league: "Ligue 1 (Francë)", date: "Sot (" + sDay + "), 21:00", 
-            home: "Monaco", away: "Strasbourg", odd: 1.76, betType: "1 & Mbi 1.5 Gola",
-            homeForm: "V V F B V", awayForm: "H F V H F", 
-            homeStats: "Sulm shumë i fuqishëm", awayStats: "Dobët në mbrojtje jashtë",
-            winProb: "Nikoqiri 55% | Barazim 25% | Mysafiri 20%"
-        },
-        { 
-            source: "Bookmaker B", league: "Serie A (Itali)", date: "Nesër (" + nDay + "), 18:30", 
-            home: "Empoli", away: "Verona", odd: 1.75, betType: "1X (Nikoqiri ose Barazim)",
-            homeForm: "B V H F V", awayForm: "H H F V H", 
-            homeStats: "Luan me ritëm të lartë", awayStats: "Dobët jashtë fushe",
-            winProb: "Nikoqiri 50% | Barazim 30% | Mysafiri 20%"
-        },
-        { 
-            source: "Bookmaker C", league: "Bundesliga (Gjermani)", date: "Nesër (" + nDay + "), 20:30", 
-            home: "Hoffenheim", away: "Union Berlin", odd: 1.90, betType: "Mbi 2.5 Gola",
-            homeForm: "V V H F V", awayForm: "F H V B H", 
-            homeStats: "Gola në 9 nga 10 ndeshjet", awayStats: "Luan hapur dhe krijon raste",
-            winProb: "Nikoqiri 48% | Barazim 25% | Mysafiri 27%"
-        },
-        { 
-            source: "Bookmaker A", league: "Eredivisie (Holandë)", date: "Nesër (" + nDay + "), 16:45", 
-            home: "Ajax", away: "Feyenoord", odd: 1.85, betType: "Golat 2-3",
-            homeForm: "V V V F V", awayForm: "V F V V B", 
-            homeStats: "Dominues në sulm", awayStats: "Derbi me intensitet të lartë",
-            winProb: "Nikoqiri 52% | Barazim 23% | Mysafiri 25%"
-        },
-        { 
-            source: "Bookmaker B", league: "Premier League (Angli)", date: "Nesër (" + nDay + "), 21:00", 
-            home: "Everton", away: "West Ham", odd: 1.80, betType: "Të dyja shënojnë (GG)",
-            homeForm: "H V B V H", awayForm: "V H F V B", 
-            homeStats: "Agresiv në shtëpi", awayStats: "Sulm efikas në kundërsulm",
-            winProb: "Nikoqiri 44% | Barazim 31% | Mysafiri 25%"
-        },
-        { 
-            source: "Bookmaker C", league: "Champions League", date: "Pasnesër (" + pDay + "), 21:00", 
-            home: "Arsenal", away: "Bayern Munich", odd: 1.88, betType: "Mbi 2.5 Gola",
-            homeForm: "V V F V V", awayForm: "V V V H V", 
-            homeStats: "Statistika fantastike në shtëpi", awayStats: "Sulm i frikshëm",
-            winProb: "Nikoqiri 45% | Barazim 25% | Mysafiri 30%"
-        },
-        { 
-            source: "Bookmaker A", league: "Champions League", date: "Pasnesër (" + pDay + "), 21:00", 
-            home: "Real Madrid", away: "Liverpool", odd: 1.92, betType: "Të dyja shënojnë (GG)",
-            homeForm: "V B V V F", awayForm: "V V F V V", 
-            homeStats: "E pamposhtur në Bernabeu", awayStats: "Shënoi në çdo ndeshje evropiane",
-            winProb: "Nikoqiri 46% | Barazim 24% | Mysafiri 30%"
-        },
-        { 
-            source: "Bookmaker B", league: "Serie A (Itali)", date: "Pasnesër (" + pDay + "), 20:45", 
-            home: "Inter", away: "Roma", odd: 1.70, betType: "1 (Fiton Nikoqiri)",
-            homeForm: "V V V V B", awayForm: "F H V B F", 
-            homeStats: "Mbrojtja më e fortë", awayStats: "Lëkundje në transfertë",
-            winProb: "Nikoqiri 58% | Barazim 25% | Mysafiri 17%"
-        },
-        { 
-            source: "Bookmaker C", league: "La Liga (Spanjë)", date: "Pasnesër (" + pDay + "), 19:00", 
-            home: "Barcelona", away: "Villarreal", odd: 1.83, betType: "1 & Mbi 1.5 Gola",
-            homeForm: "V V V H V", awayForm: "V H V F V", 
-            homeStats: "Mesatare e lartë golash", awayStats: "Luan hapur ndaj ekipeve të mëdha",
-            winProb: "Nikoqiri 60% | Barazim 20% | Mysafiri 20%"
-        }
+        { source: "Bookmaker A", league: "Premier League (Angli)", date: "Sot (" + fmt(d0) + "), 20:30", home: "Brentford", away: "Newcastle", odd: 1.78, betType: "Mbi 2.5 Gola", homeForm: "F V H F B", awayForm: "V F V H V", homeStats: "Mes. 1.8 gola", awayStats: "Formë e shkëlqyer", winProb: "Nikoqiri 42% | Barazim 28% | Mysafiri 30%" },
+        { source: "Bookmaker B", league: "La Liga (Spanjë)", date: "Sot (" + fmt(d0) + "), 21:00", home: "Rayo Vallecano", away: "Valencia", odd: 1.82, betType: "Të dyja shënojnë (GG)", homeForm: "V B H V H", awayForm: "H V B F H", homeStats: "Shënon rregullisht", awayStats: "Vulnerabël në mbrojtje", winProb: "Nikoqiri 45% | Barazim 30% | Mysafiri 25%" },
+        { source: "Bookmaker C", league: "Serie A (Itali)", date: "Sot (" + fmt(d0) + "), 18:30", home: "Como", away: "Fiorentina", odd: 1.74, betType: "1X (Nikoqiri ose Barazim)", homeForm: "V F B V F", awayForm: "H H V F B", homeStats: "Solide në shtëpi", awayStats: "Lë hapësira", winProb: "Nikoqiri 40% | Barazim 35% | Mysafiri 25%" },
+        { source: "Bookmaker A", league: "Ligue 1 (Francë)", date: "Sot (" + fmt(d0) + "), 21:00", home: "Monaco", away: "Strasbourg", odd: 1.76, betType: "1 & Mbi 1.5 Gola", homeForm: "V V F B V", awayForm: "H F V H F", homeStats: "Sulm i fuqishëm", awayStats: "Dobët jashtë", winProb: "Nikoqiri 55% | Barazim 25% | Mysafiri 20%" },
+        { source: "Bookmaker B", league: "Serie A (Itali)", date: "Nesër (" + fmt(d1) + "), 18:30", home: "Empoli", away: "Verona", odd: 1.75, betType: "1X (Nikoqiri ose Barazim)", homeForm: "B V H F V", awayForm: "H H F V H", homeStats: "Ritmet e larta", awayStats: "Dobët jashtë", winProb: "Nikoqiri 50% | Barazim 30% | Mysafiri 20%" },
+        { source: "Bookmaker C", league: "Bundesliga (Gjermani)", date: "Nesër (" + fmt(d1) + "), 20:30", home: "Hoffenheim", away: "Union Berlin", odd: 1.90, betType: "Mbi 2.5 Gola", homeForm: "V V H F V", awayForm: "F H V B H", homeStats: "Gola në ndeshje", awayStats: "Luan hapur", winProb: "Nikoqiri 48% | Barazim 25% | Mysafiri 27%" },
+        { source: "Bookmaker A", league: "Eredivisie (Holandë)", date: "Nesër (" + fmt(d1) + "), 16:45", home: "Ajax", away: "Feyenoord", odd: 1.85, betType: "Golat 2-3", homeForm: "V V V F V", awayForm: "V F V V B", homeStats: "Dominues", awayStats: "Derbi intensiv", winProb: "Nikoqiri 52% | Barazim 23% | Mysafiri 25%" },
+        { source: "Bookmaker B", league: "Premier League (Angli)", date: "Nesër (" + fmt(d1) + "), 21:00", home: "Everton", away: "West Ham", odd: 1.80, betType: "Të dyja shënojnë (GG)", homeForm: "H V B V H", awayForm: "V H F V B", homeStats: "Agresiv në shtëpi", awayStats: "Sulm efikas", winProb: "Nikoqiri 44% | Barazim 31% | Mysafiri 25%" },
+        { source: "Bookmaker C", league: "Champions League", date: "Pasnesër (" + fmt(d2) + "), 21:00", home: "Arsenal", away: "Bayern Munich", odd: 1.88, betType: "Mbi 2.5 Gola", homeForm: "V V F V V", awayForm: "V V V H V", homeStats: "Statistika në shtëpi", awayStats: "Sulm i frikshëm", winProb: "Nikoqiri 45% | Barazim 25% | Mysafiri 30%" },
+        { source: "Bookmaker A", league: "Champions League", date: "Pasnesër (" + fmt(d2) + "), 21:00", home: "Real Madrid", away: "Liverpool", odd: 1.92, betType: "Të dyja shënojnë (GG)", homeForm: "V B V V F", awayForm: "V V F V V", homeStats: "E pamposhtur", awayStats: "Shënon gjithmonë", winProb: "Nikoqiri 46% | Barazim 24% | Mysafiri 30%" },
+        { source: "Bookmaker B", league: "Serie A (Itali)", date: "Pasnesër (" + fmt(d2) + "), 20:45", home: "Inter", away: "Roma", odd: 1.70, betType: "1 (Fiton Nikoqiri)", homeForm: "V V V V B", awayForm: "F H V B F", homeStats: "Mbrojtje e fortë", awayStats: "Lëkundje", winProb: "Nikoqiri 58% | Barazim 25% | Mysafiri 17%" },
+        { source: "Bookmaker C", league: "La Liga (Spanjë)", date: "Pasnesër (" + fmt(d2) + "), 19:00", home: "Barcelona", away: "Villarreal", odd: 1.83, betType: "1 & Mbi 1.5 Gola", homeForm: "V V V H V", awayForm: "V H V F V", homeStats: "Mesatare e lartë", awayStats: "Luan hapur", winProb: "Nikoqiri 60% | Barazim 20% | Mysafiri 20%" }
     ];
 
     let shuffled = [...multiBookmakerPool].sort(() => 0.5 - Math.random());
     let finalTicket = shuffled.slice(0, 4);
 
-    if (user && user.role !== 'admin' && !user.subscriptionActive) {
+    if (user && user.role !== 'admin') {
         user.freeScansLeft -= 1;
     }
-
-    let remainingScans = user && user.role === 'admin' ? 999 : (user ? user.freeScansLeft : 0);
 
     res.json({
         status: "APPROVED",
         selectedCount: finalTicket.length,
-        freeScansLeft: remainingScans,
-        subscriptionActive: user ? user.subscriptionActive : true,
+        freeScansLeft: username === ADMIN_USER ? 999 : (user ? user.freeScansLeft : 0),
+        subscriptionActive: true,
         accuracyRate: performanceStats.accuracyRate,
         matches: finalTicket
     });
@@ -665,133 +528,4 @@ app.get('/', (req, res) => {
             try {
                 const res = await fetch('/api/process-payment', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: currentUsername, txid, plan: planSelect, amount })
-                });
-                const data = await res.json();
-
-                if(data.success) {
-                    alert("Konfirmimi u dërgua me sukses! / Confirmation sent successfully!");
-                    document.getElementById('payment-modal').style.display = 'none';
-                } else {
-                    errEl.innerText = data.error;
-                }
-            } catch(e) {
-                errEl.innerText = "Processing error.";
-            }
-        }
-
-        function closePaymentModal() {
-            document.getElementById('payment-modal').style.display = 'none';
-        }
-
-        function updateUserUI(data) {
-            const statusEl = document.getElementById('user-status-display');
-            const scansEl = document.getElementById('free-scans-display');
-            const subBtn = document.getElementById('subscribe-trigger-btn');
-
-            if (data.role === 'admin' || data.subscriptionActive) {
-                statusEl.innerText = data.role === 'admin' ? "ADMIN MASTER" : "ABONIM I PAKUFIZUAR / UNLIMITED";
-                statusEl.style.color = "#4ade80";
-                scansEl.innerText = "Unlimited";
-                subBtn.style.display = "none";
-            } else {
-                statusEl.innerText = "FALAS / FREE TRIAL";
-                statusEl.style.color = "#38bdf8";
-                scansEl.innerText = data.freeScansLeft;
-                if (data.freeScansLeft <= 0) {
-                    subBtn.style.display = "block";
-                }
-            }
-        }
-
-        async function loadAdminUsers(isInitial = false) {
-            try {
-                const res = await fetch('/api/admin/users');
-                const data = await res.json();
-                const listEl = document.getElementById('admin-users-list');
-                
-                const pendingUsers = data.users.filter(u => !u.active);
-                
-                if (!isInitial && pendingUsers.length > knownPendingCount) {
-                    const newest = pendingUsers[pendingUsers.length - 1];
-                    sendBrowserNotification(
-                        "🔔 New USDT Subscription Request!",
-                        "User: " + newest.username + " | Plan: " + newest.plan
-                    );
-                }
-                knownPendingCount = pendingUsers.length;
-
-                if (data.users.length === 0) {
-                    listEl.innerHTML = "<p style='color:#94a3b8;'>Nuk ka njoftime të reja.</p>";
-                    return;
-                }
-                let html = "";
-                data.users.forEach(u => {
-                    const badge = u.active ? "<span style='color:#4ade80; font-weight:bold;'>[UNLIMITED]</span>" : "<span style='color:#f87171; font-weight:bold;'>[PENDING]</span>";
-                    const btn = !u.active ? '<button onclick="activateUser(\'' + u.username + '\')" style="background:#15803d; color:#fff; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; margin-left:10px; font-weight:bold;">Aktivizo Tani</button>' : '<span style="color:#94a3b8; margin-left:10px; font-size:11px;">(Activated)</span>';
-                    html += '<div style="padding:10px 0; border-bottom:1px solid #334155; display:flex; justify-content:space-between; align-items:center;"><div><strong>User: ' + u.username + '</strong><br><span style="font-size:11px; color:#facc15;">Plan: ' + u.plan + '<br>TXID: ' + u.txid + '</span></div><div>' + badge + btn + '</div></div>';
-                });
-                listEl.innerHTML = html;
-            } catch(e) {}
-        }
-
-        async function activateUser(targetUser) {
-            await fetch('/api/admin/activate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ adminUser: currentUsername, targetUser })
-            });
-            loadAdminUsers(true);
-        }
-
-        async function runScan() {
-            const container = document.getElementById('results-container');
-            container.innerHTML = "<p style='color:#facc15;'>Duke analizuar tregun dhe gjeneruar biletën unike...</p>";
-            
-            try {
-                const res = await fetch('/api/scan', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: currentUsername })
-                });
-                const data = await res.json();
-                
-                if(data.error) {
-                    container.innerHTML = '<p style="color:#f87171; font-weight:bold;">' + data.error + '</p>';
-                    if (data.needsSubscription) {
-                        openPaymentModalDirect();
-                    }
-                    return;
-                }
-                
-                document.getElementById('free-scans-display').innerText = data.freeScansLeft;
-                if (data.freeScansLeft <= 0 && !data.subscriptionActive) {
-                    document.getElementById('subscribe-trigger-btn').style.display = "block";
-                }
-
-                let html = "<p><strong>Bileta e Skanuar (" + data.selectedCount + " Ndeshje & Analiza e Ekipeve):</strong></p>";
-                data.matches.forEach(m => {
-                    html += '<div class="match-card">' +
-                        '<span style="color:#38bdf8; font-size:12px;">📅 ' + m.date + ' | ' + m.league + ' (' + m.source + ')</span><br>' +
-                        '<strong style="font-size:15px;">' + m.home + ' vs ' + m.away + '</strong><br>' +
-                        'Rekomandimi: <span style="color:#4ade80;">' + m.betType + '</span> | Kuota: <strong>' + m.odd + '</strong>' +
-                        '<div class="match-stats">' +
-                        '📊 <strong>Forma (5 ndeshjet e fundit):</strong> Nikoqiri (' + m.homeForm + ') vs Mysafiri (' + m.awayForm + ')<br>' +
-                        '⚽ <strong>Statistikat:</strong> ' + m.homeStats + ' / ' + m.awayStats + '<br>' +
-                        '📈 <strong>Probabiliteti:</strong> ' + m.winProb +
-                        '</div></div>';
-                });
-                container.innerHTML = html;
-            } catch(e) {
-                container.innerHTML = '<p style="color:#f87171;">Server error.</p>';
-            }
-        }
-    </script>
-</body>
-</html>`);
-});
-
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-});
+                    headers: { 'Content-Type
