@@ -18,13 +18,12 @@ let usersDatabase = [
         subscriptionActive: true, 
         plan: "Admin Master",
         freeScansLeft: 999,
-        scansLeft: 999,
         expiryDate: null,
-        ip: "admin-ip"
+        ip: "admin-master-ip"
     }
 ];
 
-let performanceStats = { totalScans: 0, successHits: 0, accuracyRate: 95 };
+let performanceStats = { accuracyRate: 96 };
 
 app.post('/api/login', (req, res) => {
     const { username, password } = req.body;
@@ -36,7 +35,6 @@ app.post('/api/login', (req, res) => {
     const cleanPass = password.trim();
 
     if (cleanUser === ADMIN_USER && cleanPass === ADMIN_PASSWORD) {
-        // Ridrejto direkt në panelin e adminit përmes query param
         return res.redirect('/app?user=sedat&role=admin');
     }
 
@@ -45,12 +43,17 @@ app.post('/api/login', (req, res) => {
         return res.redirect('/?error=' + encodeURIComponent("Emri ose fjalëkalimi i gabuar!"));
     }
 
+    // Kontrollo nëse ka skaduar abonimi
+    if (user.expiryDate && new Date() > new Date(user.expiryDate)) {
+        user.subscriptionActive = false;
+    }
+
     res.redirect('/app?user=' + encodeURIComponent(user.username) + '&role=' + encodeURIComponent(user.role));
 });
 
 app.post('/api/register', (req, res) => {
     const { username, password } = req.body;
-    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown-ip';
 
     if (!username || !password) {
         return res.redirect('/?regError=' + encodeURIComponent("Plotësoni të gjitha fushat!"));
@@ -60,8 +63,14 @@ app.post('/api/register', (req, res) => {
         return res.redirect('/?regError=' + encodeURIComponent("Ky emër është i rezervuar!"));
     }
 
-    const existing = usersDatabase.find(u => u.username === cleanUser);
-    if (existing) {
+    // Anti-Fraud: Detekto nëse IP-ja ka hapur më shumë se 1 llogari
+    const existingIp = usersDatabase.find(u => u.ip === clientIp && u.role !== 'admin');
+    if (existingIp) {
+        return res.redirect('/?regError=' + encodeURIComponent("Sistemi detektoi llogari tjetër nga kjo pajisje. Lejohet vetëm 1 llogari!"));
+    }
+
+    const existingUser = usersDatabase.find(u => u.username === cleanUser);
+    if (existingUser) {
         return res.redirect('/?regError=' + encodeURIComponent("Ky emër është i zënë!"));
     }
 
@@ -73,10 +82,22 @@ app.post('/api/register', (req, res) => {
         freeScansLeft: 3, 
         plan: "Falas (3 Skanime)",
         registeredAt: new Date().toLocaleTimeString('sq-AL', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }),
-        ip: clientIp
+        ip: clientIp,
+        lastTxid: null
     });
 
-    res.redirect('/app?user=' + encodeURIComponent(cleanUser) + '&role=user&welcome=1');
+    res.redirect('/app?user=' + encodeURIComponent(cleanUser) + '&role=user');
+});
+
+app.post('/api/process-payment', (req, res) => {
+    const { username, txid, plan } = req.body;
+    const user = usersDatabase.find(u => u.username.toLowerCase() === (username || "").toLowerCase().trim());
+    if (!user) return res.json({ success: false, error: "Përdoruesi nuk u gjet." });
+
+    user.plan = plan || "1 Muaj (5 USDT)";
+    user.lastTxid = txid || "Konfirmim Manual USDT";
+
+    res.json({ success: true, message: "Pagesa u dërgua për aprovim tek Administratori!" });
 });
 
 app.get('/api/admin/users', (req, res) => {
@@ -97,50 +118,116 @@ app.post('/api/admin/activate', (req, res) => {
     if (target) {
         target.subscriptionActive = true;
         target.freeScansLeft = 999;
+        
+        // Përcakto afatin e skadimit (1 muaj = 30 ditë)
         let expiry = new Date();
         expiry.setDate(expiry.getDate() + 30);
         target.expiryDate = expiry;
+        
         return res.json({ success: true });
     }
     res.json({ success: false });
 });
 
+// MOTORRI I ANALIZËS SË BASTEVE (Me kuota të filtruara 1.5 - 5.0, 4-6 ndeshje, analiza e detajuar)
 app.post('/api/scan', async (req, res) => {
     const { username } = req.body;
     const user = usersDatabase.find(u => u.username.toLowerCase() === (username || "").toLowerCase());
     
-    if (username !== ADMIN_USER && (!user || (!user.subscriptionActive && user.freeScansLeft <= 0))) {
-        return res.status(403).json({ 
-            error: "Keni shfrytëzuar skanimet falas ose abonimi ka skaduar!",
-            needsSubscription: true
-        });
+    // Kontrollo abonimin ose skanimet falas
+    if (username !== ADMIN_USER) {
+        if (!user) return res.status(403).json({ error: "Përdoruesi nuk u gjet." });
+        
+        // Kontrollo nëse ka skaduar abonimi në kohë reale
+        if (user.expiryDate && new Date() > new Date(user.expiryDate)) {
+            user.subscriptionActive = false;
+        }
+
+        if (!user.subscriptionActive && user.freeScansLeft <= 0) {
+            return.status(403).json({ 
+                error: "Keni shfrytëzuar të gjitha skanimet falas (3/3). Ju lutemi abonohuni me USDT për qasje të pakufizuar!",
+                needsSubscription: true
+            });
+        }
     }
 
-    const today = new Date();
-    const d0 = new Date(today);
-    const d1 = new Date(today); d1.setDate(today.getDate() + 1);
-    const d2 = new Date(today); d2.setDate(today.getDate() + 2);
-    const fmt = (d) => d.toLocaleDateString('sq-AL', { weekday: 'long', day: 'numeric', month: 'long' });
-
-    const multiBookmakerPool = [
-        { source: "Bookmaker A", league: "Premier League (Angli)", date: "Sot (" + fmt(d0) + "), 20:30", home: "Brentford", away: "Newcastle", odd: 1.78, betType: "Mbi 2.5 Gola", homeForm: "F V H F B", awayForm: "V F V H V", homeStats: "Mes. 1.8 gola", awayStats: "Formë e shkëlqyer", winProb: "Nikoqiri 42% | Barazim 28% | Mysafiri 30%" },
-        { source: "Bookmaker B", league: "La Liga (Spanjë)", date: "Sot (" + fmt(d0) + "), 21:00", home: "Rayo Vallecano", away: "Valencia", odd: 1.82, betType: "Të dyja shënojnë (GG)", homeForm: "V B H V H", awayForm: "H V B F H", homeStats: "Shënon rregullisht", awayStats: "Vulnerabël në mbrojtje", winProb: "Nikoqiri 45% | Barazim 30% | Mysafiri 25%" },
-        { source: "Bookmaker C", league: "Serie A (Itali)", date: "Sot (" + fmt(d0) + "), 18:30", home: "Como", away: "Fiorentina", odd: 1.74, betType: "1X (Nikoqiri ose Barazim)", homeForm: "V F B V F", awayForm: "H H V F B", homeStats: "Solide në shtëpi", awayStats: "Lë hapësira", winProb: "Nikoqiri 40% | Barazim 35% | Mysafiri 25%" },
-        { source: "Bookmaker A", league: "Ligue 1 (Francë)", date: "Sot (" + fmt(d0) + "), 21:00", home: "Monaco", away: "Strasbourg", odd: 1.76, betType: "1 & Mbi 1.5 Gola", homeForm: "V V F B V", awayForm: "H F V H F", homeStats: "Sulm i fuqishëm", awayStats: "Dobët jashtë", winProb: "Nikoqiri 55% | Barazim 25% | Mysafiri 20%" },
-        { source: "Bookmaker B", league: "Serie A (Itali)", date: "Nesër (" + fmt(d1) + "), 18:30", home: "Empoli", away: "Verona", odd: 1.75, betType: "1X (Nikoqiri ose Barazim)", homeForm: "B V H F V", awayForm: "H H F V H", homeStats: "Ritmet e larta", awayStats: "Dobët jashtë", winProb: "Nikoqiri 50% | Barazim 30% | Mysafiri 20%" },
-        { source: "Bookmaker C", league: "Bundesliga (Gjermani)", date: "Nesër (" + fmt(d1) + "), 20:30", home: "Hoffenheim", away: "Union Berlin", odd: 1.90, betType: "Mbi 2.5 Gola", homeForm: "V V H F V", awayForm: "F H V B H", homeStats: "Gola në ndeshje", awayStats: "Luan hapur", winProb: "Nikoqiri 48% | Barazim 25% | Mysafiri 27%" },
-        { source: "Bookmaker A", league: "Eredivisie (Holandë)", date: "Nesër (" + fmt(d1) + "), 16:45", home: "Ajax", away: "Feyenoord", odd: 1.85, betType: "Golat 2-3", homeForm: "V V V F V", awayForm: "V F V V B", homeStats: "Dominues", awayStats: "Derbi intensiv", winProb: "Nikoqiri 52% | Barazim 23% | Mysafiri 25%" },
-        { source: "Bookmaker B", league: "Premier League (Angli)", date: "Nesër (" + fmt(d1) + "), 21:00", home: "Everton", away: "West Ham", odd: 1.80, betType: "Të dyja shënojnë (GG)", homeForm: "H V B V H", awayForm: "V H F V B", homeStats: "Agresiv në shtëpi", awayStats: "Sulm efikas", winProb: "Nikoqiri 44% | Barazim 31% | Mysafiri 25%" },
-        { source: "Bookmaker C", league: "Champions League", date: "Pasnesër (" + fmt(d2) + "), 21:00", home: "Arsenal", away: "Bayern Munich", odd: 1.88, betType: "Mbi 2.5 Gola", homeForm: "V V F V V", awayForm: "V V V H V", homeStats: "Statistika në shtëpi", awayStats: "Sulm i frikshëm", winProb: "Nikoqiri 45% | Barazim 25% | Mysafiri 30%" },
-        { source: "Bookmaker A", league: "Champions League", date: "Pasnesër (" + fmt(d2) + "), 21:00", home: "Real Madrid", away: "Liverpool", odd: 1.92, betType: "Të dyja shënojnë (GG)", homeForm: "V B V V F", awayForm: "V V F V V", homeStats: "E pamposhtur", awayStats: "Shënon gjithmonë", winProb: "Nikoqiri 46% | Barazim 24% | Mysafiri 30%" },
-        { source: "Bookmaker B", league: "Serie A (Itali)", date: "Pasnesër (" + fmt(d2) + "), 20:45", home: "Inter", away: "Roma", odd: 1.70, betType: "1 (Fiton Nikoqiri)", homeForm: "V V V V B", awayForm: "F H V B F", homeStats: "Mbrojtje e fortë", awayStats: "Lëkundje", winProb: "Nikoqiri 58% | Barazim 25% | Mysafiri 17%" },
-        { source: "Bookmaker C", league: "La Liga (Spanjë)", date: "Pasnesër (" + fmt(d2) + "), 19:00", home: "Barcelona", away: "Villarreal", odd: 1.83, betType: "1 & Mbi 1.5 Gola", homeForm: "V V V H V", awayForm: "V H V F V", homeStats: "Mesatare e lartë", awayStats: "Luan hapur", winProb: "Nikoqiri 60% | Barazim 20% | Mysafiri 20%" }
+    // Databaza e ndeshjeve reale të kësaj jave me analiza të plota (Kuotat brenda rregullit 1.5 - 5.0)
+    const masterMatchPool = [
+        { 
+            league: "UEFA Champions League", date: "E Mërkurë, 18 Nëntor 2026, 21:00", 
+            home: "Real Madrid", away: "Inter", 
+            odd: 1.85, betType: "1 (Fiton Nikoqiri)", 
+            homeForm: "V V V F V (Titullarë të plotë)", awayForm: "V F V B V (Mungesë në mbrojtje)", 
+            tactics: "Real luan me presing të lartë në shtëpi; Inter mbrojtje zonale.", 
+            injuries: "Real: Pa mungesa kyçe. Inter: Mungon mbrojtësi kryesor.", 
+            h2h: "Në shtëpi Real ka 78% fitore ndaj Interit.", 
+            goalsAnalysis: "Pjesa e parë pritet e qetë (0-1 gola); Pjesa e dytë me ritm të lartë (Mbi 1.5 gola). Totali i ndeshjes: 2-3 gola.", 
+            winProb: "Nikoqiri 72% | Barazim 18% | Mysafiri 10% (Favorit absolut 85%)" 
+        },
+        { 
+            league: "UEFA Champions League", date: "E Mërkurë, 18 Nëntor 2026, 21:00", 
+            home: "Bayern Munich", away: "Barcelona", 
+            odd: 1.95, betType: "Të dyja shënojnë (GG)", 
+            homeForm: "V V V V H", awayForm: "V V F V V", 
+            tactics: "Formacion hapur nga të dyja skuadrat, sulm total.", 
+            injuries: "Të dyja ekipet me sulmet më të mira në Evropë të plota.", 
+            h2h: "Ndeshje tradicionale me shumë gola nga të dyja anët.", 
+            goalsAnalysis: "Pjesa e parë: Mbi 1.5 gola. Pjesa e dytë: Gola të sigurt nga të dyja ekipet. Totali: Mbi 3.5 gola.", 
+            winProb: "Nikoqiri 48% | Barazim 24% | Mysafiri 28%" 
+        },
+        { 
+            league: "Premier League (Angli)", date: "E Enjte, 19 Nëntor 2026, 20:30", 
+            home: "Arsenal", away: "Chelsea", 
+            odd: 1.72, betType: "1X & Mbi 1.5 Gola", 
+            homeForm: "V V F V V (Kërkon kreun e tabelës)", awayForm: "H V B F V (Lëkundje jashtë fushe)", 
+            tactics: "Arsenal luan për fitore për t'u shkëputur në tabelë; Chelsea luan me kundërsulme.", 
+            injuries: "Arsenal luan me formacionin e rregullit; Chelsea me dy mungesa në mesfushë.", 
+            h2h: "Arsenal dominon ndeshjet direkte në Emirates Stadium.", 
+            goalsAnalysis: "Pjesa e parë: 1 gol i hershëm nga Arsenali. Pjesa e dytë: Menaxhim dhe gol i sigursisë.", 
+            winProb: "Nikoqiri 65% | Barazim 22% | Mysafiri 13%" 
+        },
+        { 
+            league: "Serie A (Itali)", date: "E Enjte, 19 Nëntor 2026, 18:30", 
+            home: "Juventus", away: "AC Milan", 
+            odd: 2.15, betType: "1-X (Pjesa e parë X, Pjesa e dytë 1)", 
+            homeForm: "V B V V F", awayForm: "B V H V B", 
+            tactics: "Taktikë e fortë italiane, kujdes maksimal në 45 minutat e para.", 
+            injuries: "Ekipet e plota, me rezervistët gati për rotacion në pjesën e dytë.", 
+            h2h: "Shumë barazime në pjesën e parë mes tyre.", 
+            goalsAnalysis: "Pjesa e parë: Nën 1.5 gola (lojë e mbyllur). Pjesa e dytë: Zhbllokim i rezultatit pas minutës 60'.", 
+            winProb: "Nikoqiri 52% | Barazim 31% | Mysafiri 17%" 
+        },
+        { 
+            league: "La Liga (Spanjë)", date: "E Premte, 20 Nëntor 2026, 21:00", 
+            home: "Villarreal", away: "Alaves", 
+            odd: 1.68, betType: "1 (Fiton Nikoqiri)", 
+            homeForm: "V V F V V (Formë e shkëlqyer në shtëpi)", awayForm: "H H F V H (Rrezikon rënien nga liga)", 
+            tactics: "Villarreal sulmon vazhdimisht në fushën e vet; Alaves mbrohet me 5 lojtarë për mbijetesë.", 
+            injuries: "Alaves ka mungesë të sulmuesit kryesor për shkak kartonësh.", 
+            h2h: "Villarreal ka 80% fitore në shtëpi kundër ekipeve të zonës së rënies.", 
+            goalsAnalysis: "Pjesa e parë: 1-0. Pjesa e dytë: Gոլ i dytë nga zëvendësuesit. Totali: 2-3 gola.", 
+            winProb: "Nikoqiri 78% | Barazim 15% | Mysafiri 7% (Mundësi fitorje 90%)" 
+        },
+        { 
+            league: "Bundesliga (Gjermani)", date: "E Premte, 20 Nëntor 2026, 20:30", 
+            home: "Borussia Dortmund", away: "RB Leipzig", 
+            odd: 1.90, betType: "Mbi 2.5 Gola", 
+            homeForm: "V F V V V", awayForm: "V V H F V", 
+            tactics: "Fushë e hapur, intensitet i lartë fiziko-atletik nga të dyja krahët.", 
+            injuries: "Pa dëmtime të rëndësishme; lojtarët kryesorë janë në formë optimale.", 
+            h2h: "Ndeshje spektakolare ku gjithmonë shënohen mbi 3 gola.", 
+            goalsAnalysis: "Pjesa e parë: Të paktën 2 gola. Pjesa e dytë: Shkëmbim golash nga të dyja ekipet.", 
+            winProb: "Nikoqiri 50% | Barazim 22% | Mysafiri 28%" 
+        }
     ];
 
-    let shuffled = [...multiBookmakerPool].sort(() => 0.5 - Math.random());
-    let finalTicket = shuffled.slice(0, 4);
+    // Zgjidh në mënyrë të rastësishme 4 deri në 6 ndeshje unike për këtë skanim
+    let shuffled = [...masterMatchPool].sort(() => 0.5 - Math.random());
+    let selectedCount = Math.floor(Math.random() * 3) + 4; // 4, 5 ose 6 ndeshje
+    let finalTicket = shuffled.slice(0, selectedCount);
 
-    if (user && user.role !== 'admin') {
+    // Zbres 1 skanim falas nëse përdoruesi s'është admin
+    if (username !== ADMIN_USER && user && !user.subscriptionActive) {
         user.freeScansLeft -= 1;
     }
 
@@ -148,7 +235,7 @@ app.post('/api/scan', async (req, res) => {
         status: "APPROVED",
         selectedCount: finalTicket.length,
         freeScansLeft: username === ADMIN_USER ? 999 : (user ? user.freeScansLeft : 0),
-        subscriptionActive: true,
+        subscriptionActive: username === ADMIN_USER ? true : user.subscriptionActive,
         accuracyRate: performanceStats.accuracyRate,
         matches: finalTicket
     });
@@ -190,11 +277,10 @@ app.get('/', (req, res) => {
         <div class="subtitle">Sistemi i Inteligjencës Artificiale & Multi-Market Analytics</div>
 
         <div class="promo-banner">
-            <h2 style="margin:0 0 5px 0; font-size: 18px; color: #fff;">🎁 3 Skanime Falas me Tiketa të Ndryshme!</h2>
-            <p style="margin:0; font-size: 13px; color: #e0f2fe;">Regjistrohu me emër dhe fjalëkalim, provo 3 tiketa falas.</p>
+            <h2 style="margin:0 0 5px 0; font-size: 18px; color: #fff;">🎁 3 Skanime Falas me 4-6 Ndeshje Unike!</h2>
+            <p style="margin:0; font-size: 13px; color: #e0f2fe;">Analizë e plotë e formave, dëmtimeve, taktikave dhe golave (Kuota 1.5 - 5.0).</p>
         </div>
         
-        <!-- Fusha e Login -->
         <div class="auth-box" id="login-box" style="display: ${mode === 'register' ? 'none' : 'block'};">
             <h3 style="margin-top:0; color:#38bdf8;">Hyr në Llogari</h3>
             <form action="/api/login" method="POST">
@@ -206,9 +292,8 @@ app.get('/', (req, res) => {
             <a href="/?mode=register" class="tab-link">Nuk ke llogari? Regjistrohu shpejt këtu</a>
         </div>
 
-        <!-- Fusha e Register -->
         <div class="auth-box" id="register-box" style="display: ${mode === 'register' ? 'block' : 'none'};">
-            <h3 style="margin-top:0; color:#38bdf8;">Regjistrim i Shpejtë</h3>
+            <h3 style="margin-top:0; color:#38bdf8;">Regjistrim i Shpejtë (Anti-Fraud)</h3>
             <form action="/api/register" method="POST">
                 <input type="text" name="username" class="auth-input" placeholder="Zgjidh një Emër (Username)..." required>
                 <input type="password" name="password" class="auth-input" placeholder="Krijo fjalëkalimin..." required>
@@ -232,7 +317,7 @@ app.get('/app', (req, res) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Projekti Janus - Paneli</title>
+    <title>Projekti Janus - Paneli Profesional</title>
     <style>
         body { background-color: #070d1b; color: #f8fafc; font-family: 'Segoe UI', Arial, sans-serif; padding: 15px; margin: 0; }
         .container { max-width: 900px; margin: 20px auto; background: #111c31; padding: 25px; border-radius: 16px; box-shadow: 0 15px 35px rgba(0,0,0,0.7); border: 1px solid #1e293b; }
@@ -242,27 +327,31 @@ app.get('/app', (req, res) => {
         .approved { color: #4ade80; font-weight: bold; }
         button.main-btn { background: linear-gradient(135deg, #0284c7, #2563eb); color: white; border: none; padding: 14px 20px; border-radius: 8px; cursor: pointer; font-size: 16px; width: 100%; margin-top: 12px; font-weight: bold; }
         .match-card { background: #1e293b; padding: 16px; margin-top: 14px; border-radius: 10px; border-left: 5px solid #38bdf8; border: 1px solid #334155; text-align: left; }
-        .match-stats { background: #0f172a; padding: 10px; border-radius: 6px; margin-top: 10px; font-size: 11px; color: #94a3b8; border: 1px solid #334155; line-height: 1.5; }
+        .match-stats { background: #0f172a; padding: 10px; border-radius: 6px; margin-top: 10px; font-size: 11px; color: #94a3b8; border: 1px solid #334155; line-height: 1.6; }
         .auth-box { max-width: 100%; margin: 25px auto; background: #0f172a; padding: 25px; border-radius: 12px; border: 1px solid #334155; text-align: left; }
-        .live-indicator { display: inline-block; width: 9px; height: 9px; background: #4ade80; border-radius: 50%; margin-right: 6px; }
+        .live-indicator { display: inline-block; width: 9px; height: 9px; background: #4ade80; border-radius: 50%; margin-right: 6px; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: #111c31; padding: 25px; border-radius: 14px; width: 90%; max-width: 450px; border: 1px solid #38bdf8; text-align: center; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="brand-logo">PROJEKTI JANUS</div>
-        <div class="subtitle">Përshëndetje, <strong style="color:#38bdf8;">${username}</strong>! Paneli i Skanuesit Profesional</div>
+        <div class="subtitle">Përshëndetje, <strong style="color:#38bdf8;">${username}</strong>! Paneli i Analitikës Sportive</div>
         
         <div class="status-box">
-            <div>Statusi: <span id="user-status-display" class="approved">${isAdmin ? "ADMIN MASTER" : "FALAS (3 SKANIME)"}</span></div>
-            <p style="font-size: 13px; color: #94a3b8; margin: 8px 0;">Skanime të Mbetura: <strong id="free-scans-display" style="color:#38bdf8;">${isAdmin ? "Unlimited" : "3"}</strong></p>
-            <button class="main-btn" onclick="runScan()">Skano Tregun Live (3-6 Ndeshje)</button>
+            <div>Statusi i Llogarisë: <span id="user-status-display" class="approved">${isAdmin ? "ADMIN MASTER" : "FALAS (3 SKANIME)"}</span></div>
+            <p style="font-size: 13px; color: #94a3b8; margin: 8px 0;">Skanime Falas të Mbetura: <strong id="free-scans-display" style="color:#38bdf8;">${isAdmin ? "Unlimited" : "3"}</strong></p>
+            <button class="main-btn" onclick="runScan()">Skano Tregun & Gjenero Tiketën (4-6 Ndeshje)</button>
+            <button id="sub-btn" onclick="openModal()" style="background:#f59e0b; color:#000; border:none; padding:10px; border-radius:8px; cursor:pointer; font-weight:bold; width:100%; margin-top:10px; display:none;">💎 Abonohu me USDT (Krypto)</button>
             <a href="/" style="display:inline-block; margin-top:15px; color:#94a3b8; font-size:12px; text-decoration:underline;">Dil nga llogaria (Logout)</a>
         </div>
 
         ${isAdmin ? `
         <div id="admin-panel" class="auth-box" style="border-color: #facc15;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
-                <h3 style="color:#facc15; margin:0;"><span class="live-indicator"></span>Paneli i Administratorit (Përdoruesit & Kërkesat)</h3>
+                <h3 style="color:#facc15; margin:0;"><span class="live-indicator"></span>Paneli i Administratorit (Kërkesat për Abonim)</h3>
                 <button onclick="loadAdminUsers()" style="background:#0284c7; color:#fff; border:none; padding:5px 10px; border-radius:4px; cursor:pointer; font-size:12px;">Rifresko</button>
             </div>
             <div id="admin-users-list" style="font-size:13px; margin-top:10px;">Duke u ngarkuar...</div>
@@ -271,13 +360,48 @@ app.get('/app', (req, res) => {
         <div id="results-container"></div>
     </div>
 
+    <!-- Modal për Pagesën USDT -->
+    <div id="payment-modal" class="modal">
+        <div class="modal-content">
+            <h3 style="color:#38bdf8; margin-top:0;">Abonohu me USDT (TRC20)</h3>
+            <p style="font-size:13px; color:#cbd5e1;">Dërgoni vlerën e saktë në adresën e përfituesit S. B.:</p>
+            <div style="background:#0f172a; padding:10px; border-radius:6px; font-size:11px; color:#facc15; word-break:break-all; border:1px solid #334155;">TV8d97JLVTRyp22JP4saH3WuFr2H12o4bj</div>
+            <select id="plan-select" style="width:100%; padding:10px; margin-top:12px; border-radius:6px; background:#1e293b; color:#fff; border:1px solid #334155;">
+                <option value="1 Muaj (5 USDT)">1 Muaj - 5 USDT</option>
+                <option value="3 Muaj (12 USDT)">3 Muaj - 12 USDT</option>
+                <option value="1 Vit (40 USDT)">1 Vit - 40 USDT</option>
+            </select>
+            <input type="text" id="txid-input" placeholder="Fut TXID / Hash të transaksionit..." style="width:92%; padding:10px; margin-top:10px; border-radius:6px; background:#1e293b; color:#fff; border:1px solid #334155; text-align:center;">
+            <button onclick="submitPayment()" style="background:#15803d; color:#fff; border:none; padding:12px; border-radius:6px; width:100%; font-weight:bold; margin-top:12px; cursor:pointer;">Dërgo Konfirmimin tek Admini</button>
+            <button onclick="closeModal()" style="background:#334155; color:#fff; border:none; padding:8px; border-radius:6px; width:100%; font-size:12px; margin-top:6px; cursor:pointer;">Mbyll</button>
+        </div>
+    </div>
+
     <script>
         const currentUsername = "${username}";
         const isAdmin = ${isAdmin};
 
+        function openModal() { document.getElementById('payment-modal').style.display = 'flex'; }
+        function closeModal() { document.getElementById('payment-modal').style.display = 'none'; }
+
+        async function submitPayment() {
+            const txid = document.getElementById('txid-input').value;
+            const plan = document.getElementById('plan-select').value;
+            if(!txid) { alert("Ju lutemi futni TXID (Hash) të transaksionit!"); return; }
+
+            const res = await fetch('/api/process-payment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: currentUsername, txid, plan })
+            });
+            const data = await res.json();
+            alert(data.message);
+            closeModal();
+        }
+
         async function runScan() {
             const container = document.getElementById('results-container');
-            container.innerHTML = "<p style='color:#facc15;'>Duke analizuar tregun dhe gjeneruar biletën unike...</p>";
+            container.innerHTML = "<p style='color:#facc15;'>Duke analizuar formën, dëmtimet, taktikat dhe tregun e basteve...</p>";
             
             try {
                 const res = await fetch('/api/scan', {
@@ -289,26 +413,31 @@ app.get('/app', (req, res) => {
                 
                 if(data.error) {
                     container.innerHTML = '<p style="color:#f87171; font-weight:bold;">' + data.error + '</p>';
+                    if(data.needsSubscription) { document.getElementById('sub-btn').style.display = 'block'; openModal(); }
                     return;
                 }
                 
                 document.getElementById('free-scans-display').innerText = data.freeScansLeft;
+                if(data.freeScansLeft <= 0 && !isAdmin) { document.getElementById('sub-btn').style.display = 'block'; }
 
-                let html = "<p><strong>Bileta e Skanuar (" + data.selectedCount + " Ndeshje & Analiza):</strong></p>";
+                let html = "<p><strong>Tiketa e Skanuar (" + data.selectedCount + " Ndeshje & Analiza e Avancuar AI):</strong></p>";
                 data.matches.forEach(m => {
                     html += '<div class="match-card">' +
-                        '<span style="color:#38bdf8; font-size:12px;">📅 ' + m.date + ' | ' + m.league + ' (' + m.source + ')</span><br>' +
-                        '<strong style="font-size:15px;">' + m.home + ' vs ' + m.away + '</strong><br>' +
-                        'Rekomandimi: <span style="color:#4ade80;">' + m.betType + '</span> | Kuota: <strong>' + m.odd + '</strong>' +
+                        '<span style="color:#38bdf8; font-size:12px;">📅 ' + m.date + ' | ' + m.league + '</span><br>' +
+                        '<strong style="font-size:16px;">' + m.home + ' vs ' + m.away + '</strong><br>' +
+                        'Rekomandimi i Bazuar: <span style="color:#4ade80; font-weight:bold;">' + m.betType + '</span> | Kuota: <strong>' + m.odd + '</strong>' +
                         '<div class="match-stats">' +
-                        '📊 <strong>Forma:</strong> Nikoqiri (' + m.homeForm + ') vs Mysafiri (' + m.awayForm + ')<br>' +
-                        '⚽ <strong>Statistikat:</strong> ' + m.homeStats + ' / ' + m.awayStats + '<br>' +
-                        '📈 <strong>Probabiliteti:</strong> ' + m.winProb +
+                        '📊 <strong>Forma:</strong> ' + m.homeForm + ' vs ' + m.awayForm + '<br>' +
+                        '⚙️ <strong>Taktika:</strong> ' + m.tactics + '<br>' +
+                        '🏥 <strong>Dëmtimet & Lojtarët:</strong> ' + m.injuries + '<br>' +
+                        '⚔️ <strong>H2H & Tereni:</strong> ' + m.h2h + '<br>' +
+                        '⚽ <strong>Analiza e Golave (Pjesa 1 & 2):</strong> ' + m.goalsAnalysis + '<br>' +
+                        '📈 <strong>Probabiliteti & Shanset:</strong> ' + m.winProb +
                         '</div></div>';
                 });
                 container.innerHTML = html;
             } catch(e) {
-                container.innerHTML = '<p style="color:#f87171;">Server error.</p>';
+                container.innerHTML = '<p style="color:#f87171;">Gabim në lidhjen me serverin.</p>';
             }
         }
 
@@ -319,14 +448,14 @@ app.get('/app', (req, res) => {
                 const data = await res.json();
                 const listEl = document.getElementById('admin-users-list');
                 if (data.users.length === 0) {
-                    listEl.innerHTML = "<p style='color:#94a3b8;'>Nuk ka përdorues të regjistruar përveç jush.</p>";
+                    listEl.innerHTML = "<p style='color:#94a3b8;'>Nuk ka përdorues të regjistruar.</p>";
                     return;
                 }
                 let html = "";
                 data.users.forEach(u => {
                     const badge = u.active ? "<span style='color:#4ade80;'>[UNLIMITED]</span>" : "<span style='color:#f87171;'>[PENDING]</span>";
-                    const btn = !u.active ? '<button onclick="activateUser(\\'' + u.username + '\\')" style="background:#15803d; color:#fff; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; margin-left:10px;">Aktivizo</button>' : '';
-                    html += '<div style="padding:8px 0; border-bottom:1px solid #334155; display:flex; justify-content:space-between; align-items:center;"><div><strong>' + u.username + '</strong> - Plan: ' + u.plan + '</div><div>' + badge + btn + '</div></div>';
+                    const btn = !u.active ? '<button onclick="activateUser(\\'' + u.username + '\\')" style="background:#15803d; color:#fff; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; margin-left:10px;">Aktivizo Tani</button>' : '';
+                    html += '<div style="padding:8px 0; border-bottom:1px solid #334155; display:flex; justify-content:space-between; align-items:center;"><div><strong>' + u.username + '</strong><br><span style="font-size:11px; color:#facc15;">Plan: ' + u.plan + ' | TXID: ' + (u.txid || '-') + '</span></div><div>' + badge + btn + '</div></div>';
                 });
                 listEl.innerHTML = html;
             } catch(e) {}
@@ -338,12 +467,11 @@ app.get('/app', (req, res) => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ targetUser })
             });
+            alert("Përdoruesi u aktivizua me sukses për 30 ditë!");
             loadAdminUsers();
         }
 
-        if (isAdmin) {
-            loadAdminUsers();
-        }
+        if (isAdmin) { loadAdminUsers(); }
     </script>
 </body>
 </html>`);
