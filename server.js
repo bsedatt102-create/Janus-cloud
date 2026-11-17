@@ -35,7 +35,6 @@ app.post('/api/login', (req, res) => {
     const cleanUser = username.toLowerCase().trim();
     const cleanPass = password.trim();
 
-    // ANASHKALIM DIREKT I SIGURT PËR ADMININ
     if (cleanUser === ADMIN_USER && cleanPass === ADMIN_PASSWORD) {
         return res.json({ 
             success: true, 
@@ -50,7 +49,7 @@ app.post('/api/login', (req, res) => {
 
     const user = usersDatabase.find(u => u.username.toLowerCase() === cleanUser && u.password === cleanPass);
     if (!user) {
-        return res.json({ success: false, error: "Emri ose fjalëkalimi i gabuar! / Wrong username or password!" });
+        return res.json({ success: false, error: "Emri ose fjalëkalimi i gabuar!" });
     }
 
     res.json({ 
@@ -528,4 +527,130 @@ app.get('/', (req, res) => {
             try {
                 const res = await fetch('/api/process-payment', {
                     method: 'POST',
-                    headers: { 'Content-Type
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: currentUsername, txid, plan: planSelect, amount })
+                });
+                const data = await res.json();
+
+                if(data.success) {
+                    alert("Konfirmimi u dërgua me sukses!");
+                    document.getElementById('payment-modal').style.display = 'none';
+                } else {
+                    errEl.innerText = data.error;
+                }
+            } catch(e) {
+                errEl.innerText = "Processing error.";
+            }
+        }
+
+        function closePaymentModal() {
+            document.getElementById('payment-modal').style.display = 'none';
+        }
+
+        function updateUserUI(data) {
+            const statusEl = document.getElementById('user-status-display');
+            const scansEl = document.getElementById('free-scans-display');
+            const subBtn = document.getElementById('subscribe-trigger-btn');
+
+            if (data.role === 'admin' || data.subscriptionActive) {
+                statusEl.innerText = data.role === 'admin' ? "ADMIN MASTER" : "ABONIM I PAKUFIZUAR / UNLIMITED";
+                statusEl.style.color = "#4ade80";
+                scansEl.innerText = "Unlimited";
+                subBtn.style.display = "none";
+            } else {
+                statusEl.innerText = "FALAS / FREE TRIAL";
+                statusEl.style.color = "#38bdf8";
+                scansEl.innerText = data.freeScansLeft;
+                if (data.freeScansLeft <= 0) {
+                    subBtn.style.display = "block";
+                }
+            }
+        }
+
+        async function loadAdminUsers(isInitial = false) {
+            try {
+                const res = await fetch('/api/admin/users');
+                const data = await res.json();
+                const listEl = document.getElementById('admin-users-list');
+                
+                const pendingUsers = data.users.filter(u => !u.active);
+                
+                if (!isInitial && pendingUsers.length > knownPendingCount) {
+                    const newest = pendingUsers[pendingUsers.length - 1];
+                    sendBrowserNotification(
+                        "🔔 New USDT Subscription Request!",
+                        "User: " + newest.username + " | Plan: " + newest.plan
+                    );
+                }
+                knownPendingCount = pendingUsers.length;
+
+                if (data.users.length === 0) {
+                    listEl.innerHTML = "<p style='color:#94a3b8;'>Nuk ka njoftime të reja.</p>";
+                    return;
+                }
+                let html = "";
+                data.users.forEach(u => {
+                    const badge = u.active ? "<span style='color:#4ade80; font-weight:bold;'>[UNLIMITED]</span>" : "<span style='color:#f87171; font-weight:bold;'>[PENDING]</span>";
+                    const btn = !u.active ? '<button onclick="activateUser(\'' + u.username + '\')" style="background:#15803d; color:#fff; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; margin-left:10px; font-weight:bold;">Aktivizo Tani</button>' : '<span style="color:#94a3b8; margin-left:10px; font-size:11px;">(Activated)</span>';
+                    html += '<div style="padding:10px 0; border-bottom:1px solid #334155; display:flex; justify-content:space-between; align-items:center;"><div><strong>User: ' + u.username + '</strong><br><span style="font-size:11px; color:#facc15;">Plan: ' + u.plan + '<br>TXID: ' + u.txid + '</span></div><div>' + badge + btn + '</div></div>';
+                });
+                listEl.innerHTML = html;
+            } catch(e) {}
+        }
+
+        async function activateUser(targetUser) {
+            await fetch('/api/admin/activate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ targetUser })
+            });
+            loadAdminUsers(true);
+        }
+
+        async function runScan() {
+            const container = document.getElementById('results-container');
+            container.innerHTML = "<p style='color:#facc15;'>Duke analizuar tregun dhe gjeneruar biletën unike...</p>";
+            
+            try {
+                const res = await fetch('/api/scan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: currentUsername })
+                });
+                const data = await res.json();
+                
+                if(data.error) {
+                    container.innerHTML = '<p style="color:#f87171; font-weight:bold;">' + data.error + '</p>';
+                    if (data.needsSubscription) {
+                        openPaymentModalDirect();
+                    }
+                    return;
+                }
+                
+                document.getElementById('free-scans-display').innerText = data.freeScansLeft;
+
+                let html = "<p><strong>Bileta e Skanuar (" + data.selectedCount + " Ndeshje & Analiza e Ekipeve):</strong></p>";
+                data.matches.forEach(m => {
+                    html += '<div class="match-card">' +
+                        '<span style="color:#38bdf8; font-size:12px;">📅 ' + m.date + ' | ' + m.league + ' (' + m.source + ')</span><br>' +
+                        '<strong style="font-size:15px;">' + m.home + ' vs ' + m.away + '</strong><br>' +
+                        'Rekomandimi: <span style="color:#4ade80;">' + m.betType + '</span> | Kuota: <strong>' + m.odd + '</strong>' +
+                        '<div class="match-stats">' +
+                        '📊 <strong>Forma (5 ndeshjet e fundit):</strong> Nikoqiri (' + m.homeForm + ') vs Mysafiri (' + m.awayForm + ')<br>' +
+                        '⚽ <strong>Statistikat:</strong> ' + m.homeStats + ' / ' + m.awayStats + '<br>' +
+                        '📈 <strong>Probabiliteti:</strong> ' + m.winProb +
+                        '</div></div>';
+                });
+                container.innerHTML = html;
+            } catch(e) {
+                container.innerHTML = '<p style="color:#f87171;">Server error.</p>';
+            }
+        }
+    </script>
+</body>
+</html>`);
+});
+
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+});
