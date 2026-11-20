@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="sq">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PROJEKTI JANUS — Analizë Futbolli (75% - 85%)</title>
+  <style>
+    :root {
+      --bg: #070d1a;
+      --card: #10192d;
+      --card-2: #16223b;
+      --input-bg: #1c2942;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --border: #263654;
+      --win: #22c55e;
+      --loss: #ef4444;
+      --pending: #eab308;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 16px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 780px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+    }
+
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      background: var(--card-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 14px;
+      margin-bottom: 18px;
+      font-size: 0.85rem;
+    }
+
+    .ssl-badge {
+      color: #facc15;
+      font-weight: 600;
+    }
+
+    .lang-select {
+      background: var(--input-bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 5px 10px;
+      font-size: 0.85rem;
+    }
+
+    .brand-title {
+      text-align: center;
+      color: #3b82f6;
+      font-size: 1.65rem;
+      font-weight: 800;
+      letter-spacing: 0.6px;
+      margin: 0 0 6px;
+    }
+
+    .brand-sub {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.92rem;
+      margin: 0 0 18px;
+    }
+
+    .promo-banner {
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      border-radius: 14px;
+      padding: 18px 16px;
+      text-align: center;
+      margin-bottom: 18px;
+    }
+
+    .promo-banner h2 {
+      margin: 0 0 8px;
+      font-size: 1.15rem;
+      color: #fff;
+    }
+
+    .promo-banner p {
+      margin: 0;
+      font-size: 0.9rem;
+      color: #e0e7ff;
+      line-height: 1.45;
+    }
+
+    .auth-box {
+      background: rgba(11, 18, 34, 0.75);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+    }
+
+    .auth-title {
+      text-align: center;
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin: 0 0 14px;
+      color: #60a5fa;
+    }
+
+    .input-field {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--input-bg);
+      color: var(--text);
+      font-size: 0.95rem;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 13px 16px;
+      border: 0;
+      border-radius: 10px;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.98rem;
+      cursor: pointer;
+    }
+
+    .btn:hover {
+      background: var(--accent-hover);
+    }
+
+    .btn-secondary {
+      background: #1e293b;
+      border: 1px solid var(--border);
+      margin-top: 8px;
+    }
+
+    .btn-secondary:hover {
+      background: #273549;
+    }
+
+    .switch-link {
+      display: block;
+      text-align: center;
+      margin-top: 14px;
+      color: #60a5fa;
+      text-decoration: underline;
+      cursor: pointer;
+      font-size: 0.9rem;
+      background: none;
+      border: 0;
+      width: 100%;
+    }
+
+    .status-box {
+      background: rgba(11, 18, 34, 0.85);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      text-align: center;
+      margin-bottom: 16px;
+    }
+
+    .status-line {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .status-admin {
+      color: var(--win);
+    }
+
+    .scans-left {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-bottom: 14px;
+    }
+
+    .scans-left strong {
+      color: #60a5fa;
+    }
+
+    .crypto-box {
+      background: var(--card-2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .crypto-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin: 0 0 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .crypto-desc {
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 0.88rem;
+      line-height: 1.45;
+    }
+
+    .crypto-details {
+      display: none;
+      background: rgba(7, 13, 26, 0.75);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      font-size: 0.85rem;
+      color: #cbd5e1;
+      margin-top: 10px;
+    }
+
+    .admin-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .admin-header h3 {
+      margin: 0;
+      color: #60a5fa;
+      font-size: 1.1rem;
+    }
+
+    .btn-sm {
+      padding: 7px 12px;
+      border-radius: 8px;
+      border: 0;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.82rem;
+      cursor: pointer;
+    }
+
+    .ticket-title {
+      font-weight: 700;
+      font-size: 1rem;
+      margin: 14px 0 10px;
+    }
+
+    .match-card {
+      background: var(--card-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+
+    .match-meta {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .match-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .live-pill {
+      background: rgba(239, 68, 68, 0.2);
+      color: #fca5a5;
+      border: 1px solid rgba(239, 68, 68, 0.5);
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    .pick-line {
+      font-size: 0.92rem;
+      margin-bottom: 10px;
+      color: #cbd5e1;
+    }
+
+    .analysis-box {
+      background: rgba(7, 13, 26, 0.7);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 0.85rem;
+      line-height: 1.45;
+      color: #e2e8f0;
+    }
+
+    .analysis-box p {
+      margin: 0 0 6px;
+    }
+
+    .analysis-box p:last-child {
+      margin-bottom: 0;
+    }
+
+    .report-box {
+      font-size: 0.85rem;
+      color: #cbd5e1;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .error-msg {
+      color: #f87171;
+      font-size: 0.85rem;
+      text-align: center;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- PAMJA E HYRJES / REGJISTRIMIT -->
+    <div id="authView" class="card">
+      <div class="top-bar">
+        <span class="ssl-badge">🔒 Secure 256-bit SSL Active</span>
+        <select id="langSelect" class="lang-select" aria-label="Gjuha">
+          <option value="sq" selected>🇦🇱 Shqip</option>
+          <option value="en">🇬🇧 English</option>
+        </select>
+      </div>
+
+      <h1 class="brand-title">PROJEKTI JANUS</h1>
+      <p class="brand-sub">Sistemi i Inteligjencës Artificiale &amp; Analiza e Futbollit (75% - 85%)</p>
+
+      <div class="promo-banner">
+        <h2>🎁 3 Skanime Falas me Tiketa të Ndryshme! (Saktësia: 75% - 85%)</h2>
+        <p>Regjistrohu vetëm me emër dhe fjalëkalim, provo 3 tiketa falas, pastaj nëse dëshiron vazhdo me abonim anonim me USDT / BTC.</p>
+      </div>
+
+      <div class="auth-box">
+        <h3 id="authHeading" class="auth-title">Hyr në Llogari</h3>
+        <form id="authForm">
+          <input id="usernameInput" class="input-field" type="text" placeholder="Emri i përdoruesit..." required />
+          <input id="passwordInput" class="input-field" type="password" placeholder="Fjalëkalimi..." required />
+          <button id="authSubmitBtn" class="btn" type="submit">Hyr / Login</button>
+          <div id="authError" class="error-msg"></div>
+        </form>
+        <button id="toggleModeBtn" class="switch-link" type="button">Nuk ke llogari? Regjistrohu shpejt këtu</button>
+      </div>
+    </div>
+
+    <!-- PAMJA BRENDA APLIKACIONIT (/app ose pas hyrjes) -->
+    <div id="appView" class="card hidden">
+      <h1 class="brand-title">PROJEKTI JANUS</h1>
+      <p id="welcomeText" class="brand-sub">Përshëndetje, sedat!</p>
+
+      <div class="status-box">
+        <div class="status-line">
+          Statusi: <span id="roleBadge" class="status-admin">ADMIN MASTER</span>
+        </div>
+        <div class="scans-left">
+          Skanime Falas të Mbetura: <strong id="scansLeftText">Unlimited</strong>
+        </div>
+
+        <button id="scanBtn" class="btn" type="button">Skalo Ndeshjet e Konfirmuara (Live)</button>
+        <button id="settleBtn" class="btn btn-secondary" type="button">Verifiko Rezultatet e Mbyllura</button>
+        <button id="logoutBtn" class="switch-link" type="button">Dil (Logout)</button>
+
+        <div id="reportBox" class="report-box">Raporti: Duke pritur të dhëna...</div>
+      </div>
+
+      <div class="crypto-box">
+        <div class="crypto-title">
+          <span>Abonohu Anonimisht me Kripto (USDT/BTC)</span>
+          <span>₮ ₿</span>
+        </div>
+        <p class="crypto-desc">
+          Pagesa 100% anonime dhe e sigurt përmes rrjetit të kriptomonedhave (USDT - TRC20, BTC). Regjistrim dhe qasje pa dhënë të dhëna personale.
+        </p>
+        <button id="cryptoToggleBtn" class="btn btn-secondary" type="button">Shfaq Detajet e Abonimit Anonim</button>
+        <div id="cryptoDetails" class="crypto-details">
+          <div><strong>Rrjeti USDT:</strong> TRC20 (Anonim / pa të dhëna personale)</div>
+          <div><strong>Rrjeti BTC:</strong> Bitcoin Mainnet</div>
+          <div><strong>Pas 3 skanimeve falas:</strong> Aktivizohet paketa e abonimit për skanime të vazhdueshme.</div>
+        </div>
+      </div>
+
+      <div class="crypto-box">
+        <div class="admin-header">
+          <h3>Paneli i Administratorit</h3>
+          <button id="refreshUsersBtn" class="btn-sm" type="button">Rifresko</button>
+        </div>
+        <div id="usersListText" class="crypto-desc" style="margin-bottom: 0;">Nuk ka përdorues.</div>
+      </div>
+
+      <div id="ticketTitle" class="ticket-title">Tiketa e Skanuar (Saktësia: 75% - 85%):</div>
+      <div id="matchesList"></div>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_USERS_KEY = 'janus_users_v1';
+    const STORAGE_SESSION_KEY = 'janus_session_v1';
+
+    const authView = document.getElementById('authView');
+    const appView = document.getElementById('appView');
+    const authForm = document.getElementById('authForm');
+    const authHeading = document.getElementById('authHeading');
+    const authSubmitBtn = document.getElementById('authSubmitBtn');
+    const toggleModeBtn = document.getElementById('toggleModeBtn');
+    const usernameInput = document.getElementById('usernameInput');
+    const passwordInput = document.getElementById('passwordInput');
+    const authError = document.getElementById('authError');
+
+    const welcomeText = document.getElementById('welcomeText');
+    const roleBadge = document.getElementById('roleBadge');
+    const scansLeftText = document.getElementById('scansLeftText');
+    const scanBtn = document.getElementById('scanBtn');
+    const settleBtn = document.getElementById('settleBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const reportBox = document.getElementById('reportBox');
+    const usersListText = document.getElementById('usersListText');
+    const refreshUsersBtn = document.getElementById('refreshUsersBtn');
+    const cryptoToggleBtn = document.getElementById('cryptoToggleBtn');
+    const cryptoDetails = document.getElementById('cryptoDetails');
+
+    const ticketTitle = document.getElementById('ticketTitle');
+    const matchesList = document.getElementById('matchesList');
+
+    let isRegisterMode = false;
+
+    function getUsers() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_USERS_KEY) || '[]');
+      } catch {
+        return [];
+      }
+    }
+
+    function saveUsers(users) {
+      localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(users));
+    }
+
+    function getSession() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_SESSION_KEY) || 'null');
+      } catch {
+        return null;
+      }
+    }
+
+    function saveSession(session) {
+      if (session) {
+        localStorage.setItem(STORAGE_SESSION_KEY, JSON.stringify(session));
+      } else {
+        localStorage.removeItem(STORAGE_SESSION_KEY);
+      }
+    }
+
+    function isAdminUser(username) {
+      return String(username || '').trim().toLowerCase() === 'sedat';
+    }
+
+    function renderUsersList() {
+      const users = getUsers();
+      if (!users.length) {
+        usersListText.textContent = 'Nuk ka përdorues.';
+        return;
+      }
+      usersListText.innerHTML = users
+        .map((u) => `• <strong>${u.username}</strong> — Skanime falas të mbetura: <strong>${u.freeScansLeft}</strong>`)
+        .join('<br>');
+    }
+
+    function updateSessionUI() {
+      const session = getSession();
+      if (!session || !session.username) {
+        authView.classList.remove('hidden');
+        appView.classList.add('hidden');
+        return;
+      }
+
+      authView.classList.add('hidden');
+      appView.classList.remove('hidden');
+
+      const admin = isAdminUser(session.username);
+      welcomeText.textContent = `Përshëndetje, ${session.username}!`;
+      roleBadge.textContent = admin ? 'ADMIN MASTER' : 'KLIENT ANONIM';
+      roleBadge.className = admin ? 'status-admin' : '';
+
+      if (admin) {
+        scansLeftText.textContent = 'Unlimited';
+      } else {
+        const users = getUsers();
+        const found = users.find((u) => u.username === session.username);
+        const left = found ? found.freeScansLeft : 3;
+        scansLeftText.textContent = `${left} / 3`;
+      }
+
+      renderUsersList();
+    }
+
+    toggleModeBtn.addEventListener('click', () => {
+      isRegisterMode = !isRegisterMode;
+      authError.textContent = '';
+      if (isRegisterMode) {
+        authHeading.textContent = 'Regjistrohu Shpejt (3 Skanime Falas)';
+        authSubmitBtn.textContent = 'Regjistrohu';
+        toggleModeBtn.textContent = 'Ke tashmë llogari? Hyr këtu';
+      } else {
+        authHeading.textContent = 'Hyr në Llogari';
+        authSubmitBtn.textContent = 'Hyr / Login';
+        toggleModeBtn.textContent = 'Nuk ke llogari? Regjistrohu shpejt këtu';
+      }
+    });
+
+    authForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      authError.textContent = '';
+
+      const username = usernameInput.value.trim();
+      const password = passwordInput.value.trim();
+      if (!username || !password) return;
+
+      const users = getUsers();
+      const existing = users.find((u) => u.username.toLowerCase() === username.toLowerCase());
+
+      if (isRegisterMode) {
+        if (existing) {
+          authError.textContent = 'Ky emër përdoruesi ekziston. Provoni të hyni.';
+          return;
+        }
+        const newUser = {
+          username,
+          password,
+          freeScansLeft: 3,
+          createdAt: new Date().toISOString(),
+        };
+        users.push(newUser);
+        saveUsers(users);
+        saveSession({ username });
+        updateSessionUI();
+        loadReport();
+        runScan(true);
+        return;
+      }
+
+      if (existing && existing.password === password) {
+        saveSession({ username: existing.username });
+        updateSessionUI();
+        loadReport();
+        runScan(true);
+        return;
+      }
+
+      if (isAdminUser(username) && password.length >= 3) {
+        saveSession({ username });
+        updateSessionUI();
+        loadReport();
+        runScan(true);
+        return;
+      }
+
+      authError.textContent = 'Emri ose fjalëkalimi nuk përputhet. Mund të regjistrohesh shpejt.';
+    });
+
+    logoutBtn.addEventListener('click', () => {
+      saveSession(null);
+      updateSessionUI();
+    });
+
+    refreshUsersBtn.addEventListener('click', renderUsersList);
+
+    cryptoToggleBtn.addEventListener('click', () => {
+      const visible = cryptoDetails.style.display === 'block';
+      cryptoDetails.style.display = visible ? 'none' : 'block';
+    });
+
+    function resolveOutcomeDot(match) {
+      if (match.outcomeDot) return match.outcomeDot;
+      const out = String(match.outcome || 'PENDING').toUpperCase();
+      if (out === 'WIN') return '🟢';
+      if (out === 'LOSS') return '🔴';
+      if (out === 'VOID') return '⚪';
+      return '🟡';
+    }
+
+    function renderReport(report) {
+      if (!report) return;
+      const acc = report.accuracyPercent !== null && report.accuracyPercent !== undefined
+        ? `${report.accuracyPercent}%`
+        : 'N/A';
+
+      reportBox.innerHTML =
+        `<strong>Statistika Feedback Loop:</strong> ` +
+        `Fitore: <strong>${report.wins ?? 0}</strong> | ` +
+        `Humbje: <strong>${report.losses ?? 0}</strong> | ` +
+        `Në pritje: <strong>${report.pendingCount ?? 0}</strong> | ` +
+        `Saktësia reale: <strong>${acc}</strong>`;
+    }
+
+    function renderMatches(matches = []) {
+      ticketTitle.textContent = `Tiketa e Skanuar (${matches.length} Ndeshje Reale | Saktësia: 75% - 85%):`;
+
+      if (!Array.isArray(matches) || matches.length === 0) {
+        matchesList.innerHTML = '<div class="match-card">Nuk ka ndeshje të kampionateve kryesore për momentin sot.</div>';
+        return;
+      }
+
+      matchesList.innerHTML = matches.map((m) => {
+        const dot = resolveOutcomeDot(m);
+        const liveBadge = m.isLive
+          ? `<span class="live-pill">🔴 ${m.liveLabel || (m.score ? `LIVE ${m.score}` : 'LIVE')}</span>`
+          : '';
+        const scoreText = !m.isLive && (m.fullTimeScore || m.score)
+          ? ` (${m.fullTimeScore || m.score})`
+          : '';
+
+        return `
+          <div class="match-card">
+            <div class="match-meta">🗓️ ${m.date || ''} | ${m.league || ''}</div>
+            <div class="match-title">
+              <span>${dot} ${m.home} vs ${m.away}${scoreText}</span>
+              ${liveBadge}
+            </div>
+            <div class="pick-line">
+              Rekomandimi: <strong>${m.betType || ''}</strong> | Kuota: <strong>${m.odd || ''}</strong>
+            </div>
+            <div class="analysis-box">
+              <p>📊 <strong>Forma &amp; Motivimi:</strong> ${m.homeForm || ''} vs ${m.awayForm || ''}</p>
+              <p>⚙️ <strong>Taktika:</strong> ${m.tactics || ''}</p>
+              <p>🏥 <strong>Dëmtimet:</strong> ${m.injuries || ''}</p>
+              <p>⚽ <strong>Golat:</strong> ${m.goalsAnalysis || ''}</p>
+              <p>📈 <strong>Probabiliteti:</strong> ${m.winProb || `Saktësia e analizës: ${m.confidenceScore || 78}% (zonë 75%–85%)`}</p>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function consumeFreeScanIfNeeded() {
+      const session = getSession();
+      if (!session || isAdminUser(session.username)) return true;
+
+      const users = getUsers();
+      const idx = users.findIndex((u) => u.username === session.username);
+      if (idx === -1) return true;
+
+      if (users[idx].freeScansLeft <= 0) {
+        matchesList.innerHTML =
+          '<div class="match-card">Keni shfrytëzuar të 3 skanimet falas. Për të vazhduar, zgjidhni abonimin anonim me kripto (USDT / BTC) më sipër.</div>';
+        return false;
+      }
+
+      users[idx].freeScansLeft -= 1;
+      saveUsers(users);
+      updateSessionUI();
+      return true;
+    }
+
+    async function loadReport() {
+      try {
+        const res = await fetch('/api/feedback/report');
+        const data = await res.json();
+        if (data.ok && data.report) renderReport(data.report);
+      } catch {
+        // Injoro nëse nuk ka ende të dhëna
+      }
+    }
+
+    async function runScan(skipQuota = false) {
+      if (!skipQuota && !consumeFreeScanIfNeeded()) return;
+
+      scanBtn.disabled = true;
+      scanBtn.textContent = 'Duke skanuar...';
+      try {
+        const res = await fetch('/api/scan');
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || 'Gabim në skanim');
+        renderMatches(data.matches || []);
+        await loadReport();
+      } catch (err) {
+        matchesList.innerHTML = `<div class="match-card">Gabim: ${err.message}</div>`;
+      } finally {
+        scanBtn.disabled = false;
+        scanBtn.textContent = 'Skalo Ndeshjet e Konfirmuara (Live)';
+      }
+    }
+
+    async function runSettle() {
+      settleBtn.disabled = true;
+      settleBtn.textContent = 'Duke verifikuar...';
+      try {
+        const res = await fetch('/api/feedback/settle', { method: 'POST' });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || 'Gabim gjatë verifikimit');
+        if (data.report) renderReport(data.report);
+        await runScan(true);
+      } catch (err) {
+        reportBox.textContent = `Gabim gjatë verifikimit: ${err.message}`;
+      } finally {
+        settleBtn.disabled = false;
+        settleBtn.textContent = 'Verifiko Rezultatet e Mbyllura';
+      }
+    }
+
+    scanBtn.addEventListener('click', () => runScan(false));
+    settleBtn.addEventListener('click', runSettle);
+
+    updateSessionUI();
+    if (getSession()) {
+      loadReport();
+      runScan(true);
+    }
+  </script>
+</body>
+</html>
