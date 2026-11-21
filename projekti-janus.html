@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html lang="sq">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#070d1a" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icon-192.svg" />
+  <title>PROJEKTI JANUS — Analizë Futbolli (75% - 85%)</title>
+  <style>
+    :root {
+      --bg: #070d1a;
+      --card: #10192d;
+      --card-2: #16223b;
+      --input-bg: #1c2942;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --border: #263654;
+      --win: #22c55e;
+      --loss: #ef4444;
+      --pending: #eab308;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 16px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 780px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+    }
+
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      background: var(--card-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 14px;
+      margin-bottom: 18px;
+      font-size: 0.85rem;
+    }
+
+    .ssl-badge {
+      color: #facc15;
+      font-weight: 600;
+    }
+
+    .brand-title {
+      text-align: center;
+      color: #3b82f6;
+      font-size: 1.65rem;
+      font-weight: 800;
+      letter-spacing: 0.6px;
+      margin: 0 0 6px;
+    }
+
+    .brand-sub {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.92rem;
+      margin: 0 0 18px;
+    }
+
+    .promo-banner {
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      border-radius: 14px;
+      padding: 18px 16px;
+      text-align: center;
+      margin-bottom: 18px;
+    }
+
+    .promo-banner h2 {
+      margin: 0 0 8px;
+      font-size: 1.12rem;
+      color: #fff;
+    }
+
+    .promo-banner p {
+      margin: 0;
+      font-size: 0.88rem;
+      color: #e0e7ff;
+      line-height: 1.45;
+    }
+
+    .auth-box {
+      background: rgba(11, 18, 34, 0.75);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+    }
+
+    .auth-title {
+      text-align: center;
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin: 0 0 14px;
+      color: #60a5fa;
+    }
+
+    .input-field {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--input-bg);
+      color: var(--text);
+      font-size: 0.95rem;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 13px 16px;
+      border: 0;
+      border-radius: 10px;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.98rem;
+      cursor: pointer;
+    }
+
+    .btn:hover { background: var(--accent-hover); }
+
+    .btn-secondary {
+      background: #1e293b;
+      border: 1px solid var(--border);
+      margin-top: 8px;
+    }
+
+    .btn-secondary:hover { background: #273549; }
+
+    .switch-link {
+      display: block;
+      text-align: center;
+      margin-top: 14px;
+      color: #60a5fa;
+      text-decoration: underline;
+      cursor: pointer;
+      font-size: 0.9rem;
+      background: none;
+      border: 0;
+      width: 100%;
+    }
+
+    .status-box {
+      background: rgba(11, 18, 34, 0.85);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      text-align: center;
+      margin-bottom: 16px;
+    }
+
+    .status-line {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .status-active { color: var(--win); }
+    .status-free { color: #60a5fa; }
+    .status-hold { color: var(--loss); }
+
+    .quota-info {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-bottom: 12px;
+      line-height: 1.45;
+    }
+
+    .quota-info strong { color: #e2e8f0; }
+
+    .hold-banner {
+      background: rgba(239, 68, 68, 0.14);
+      border: 1px solid rgba(239, 68, 68, 0.5);
+      color: #fca5a5;
+      border-radius: 12px;
+      padding: 12px;
+      font-size: 0.88rem;
+      margin-bottom: 12px;
+      line-height: 1.45;
+    }
+
+    .crypto-box {
+      background: var(--card-2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .crypto-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin: 0 0 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .crypto-desc {
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 0.88rem;
+      line-height: 1.45;
+    }
+
+    .plans-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    @media (max-width: 600px) {
+      .plans-grid { grid-template-columns: 1fr; }
+    }
+
+    .plan-btn {
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 12px 10px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+
+    .plan-btn.active,
+    .plan-btn:hover {
+      border-color: #3b82f6;
+      background: rgba(37, 99, 235, 0.25);
+    }
+
+    .deposit-box {
+      background: rgba(7, 13, 26, 0.8);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      margin-top: 10px;
+      font-size: 0.86rem;
+      line-height: 1.5;
+    }
+
+    .wallet-addr {
+      font-family: monospace;
+      background: #0f172a;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid #334155;
+      color: #93c5fd;
+      word-break: break-all;
+      margin: 8px 0;
+    }
+
+    .admin-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .admin-header h3 {
+      margin: 0;
+      color: #60a5fa;
+      font-size: 1.1rem;
+    }
+
+    .btn-sm {
+      padding: 7px 12px;
+      border-radius: 8px;
+      border: 0;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.82rem;
+      cursor: pointer;
+    }
+
+    .ticket-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 14px 0 10px;
+    }
+
+    .ticket-title {
+      font-weight: 700;
+      font-size: 1rem;
+      margin: 0;
+    }
+
+    .ticket-tabs-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .ticket-tab-btn {
+      background: var(--card-2);
+      border: 1px solid var(--border);
+      color: #cbd5e1;
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-size: 0.84rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .ticket-tab-btn:hover {
+      border-color: #3b82f6;
+      color: #fff;
+    }
+
+    .ticket-tab-btn.active {
+      background: var(--accent);
+      border-color: #60a5fa;
+      color: #fff;
+    }
+
+    .ticket-submeta {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    .match-card {
+      background: var(--card-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+
+    .match-meta {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .match-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .live-pill {
+      background: rgba(239, 68, 68, 0.2);
+      color: #fca5a5;
+      border: 1px solid rgba(239, 68, 68, 0.5);
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    .outcome-pill {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #e2e8f0;
+      margin-bottom: 8px;
+    }
+
+    .loss-reason-box {
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      color: #fecaca;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 0.82rem;
+      margin-bottom: 10px;
+      line-height: 1.4;
+    }
+
+    .pick-line {
+      font-size: 0.92rem;
+      margin-bottom: 10px;
+      color: #cbd5e1;
+    }
+
+    .analysis-box {
+      background: rgba(7, 13, 26, 0.7);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 0.85rem;
+      line-height: 1.45;
+      color: #e2e8f0;
+    }
+
+    .analysis-box p { margin: 0 0 6px; }
+    .analysis-box p:last-child { margin-bottom: 0; }
+
+    .report-box {
+      font-size: 0.85rem;
+      color: #cbd5e1;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+
+    .hidden { display: none !important; }
+
+    .error-msg {
+      color: #f87171;
+      font-size: 0.85rem;
+      text-align: center;
+      margin-top: 8px;
+    }
+
+    .ok-msg {
+      color: #4ade80;
+      font-size: 0.86rem;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- HYRJE / REGJISTRIM -->
+    <div id="authView" class="card">
+      <div class="top-bar">
+        <span class="ssl-badge">🔒 Secure 256-bit SSL Active</span>
+        <span style="color:#94a3b8;">1 llogari / pajisje</span>
+      </div>
+
+      <h1 class="brand-title">PROJEKTI JANUS</h1>
+      <p class="brand-sub">Sistemi i Inteligjencës Artificiale &amp; Analiza e Futbollit (75% - 85%)</p>
+
+      <div class="promo-banner">
+        <h2>🎁 3 Tiketa Falas (3–6 Ndeshje / Tiketë) • Saktësia: 75% - 85%</h2>
+        <p>
+          Regjistrohu me <strong>nickname</strong> dhe fjalëkalim (vetëm një llogari për telefon).
+          Pas tiketave falas ose 10 ditëve pa abonim, llogaria kalon në <strong>HOLD</strong> derisa të shpërndash linkun tek klientë të tjerë (+10 ditë falas) ose të abonohesh me USDT (deri në <strong>10 tiketa</strong>, <strong>4–6 ndeshje</strong> / tiketë).
+        </p>
+      </div>
+
+      <div class="auth-box">
+        <h3 id="authHeading" class="auth-title">Hyr në Llogari</h3>
+        <form id="authForm">
+          <input id="nicknameInput" class="input-field" type="text" placeholder="Nickname..." required />
+          <input id="passwordInput" class="input-field" type="password" placeholder="Fjalëkalimi..." required />
+          <button id="authSubmitBtn" class="btn" type="submit">Hyr / Login</button>
+          <div id="authError" class="error-msg"></div>
+        </form>
+        <button id="toggleModeBtn" class="switch-link" type="button">Nuk ke llogari? Regjistrohu me nickname</button>
+      </div>
+    </div>
+
+    <!-- APLIKACIONI -->
+    <div id="appView" class="card hidden">
+      <h1 class="brand-title">PROJEKTI JANUS</h1>
+      <p id="welcomeText" class="brand-sub">Përshëndetje!</p>
+
+      <div class="status-box">
+        <div class="status-line">
+          Statusi: <span id="statusBadge" class="status-free">FREE</span>
+        </div>
+        <div id="quotaText" class="quota-info">Duke ngarkuar të dhënat e llogarisë...</div>
+        <div id="holdBanner" class="hold-banner hidden"></div>
+
+        <button id="scanBtn" class="btn" type="button">Skalo Ndeshjet e Konfirmuara (Live)</button>
+        <button id="settleBtn" class="btn btn-secondary" type="button">Verifiko Rezultatet e Mbyllura</button>
+        <button id="logoutBtn" class="switch-link" type="button">Dil (Logout)</button>
+
+        <div id="reportBox" class="report-box">Raporti: Duke pritur të dhëna...</div>
+      </div>
+
+      <!-- SHPËRNDARJA E LINKUT (+10 DITË FALAS) -->
+      <div class="crypto-box">
+        <div class="crypto-title">
+          <span>Shpërnda Linkun e Sistemit (+10 Ditë Falas)</span>
+          <span>🔗</span>
+        </div>
+        <p class="crypto-desc">
+          Shpërndaj linkun tënd tek klientë të tjerë: sa herë regjistrohet një klient i ri, fiton <strong>10 ditë falas pa abonim</strong>. Pas 10 ditëve pa abonim, llogaria mbahet në <strong>HOLD</strong> derisa të shpërndash sërish tek klientë të tjerë ose të paguash abonimin.
+        </p>
+        <div id="referralLinkBox" class="wallet-addr">Duke gjeneruar linkun...</div>
+        <div id="referralStatsText" class="crypto-desc" style="margin-bottom:10px;">
+          Ftesa të suksesshme: <strong>0</strong> • Ditë falas nga shpërndarja: <strong>0</strong>
+        </div>
+        <button id="copyRefBtn" class="btn btn-secondary" style="margin-top:0;" type="button">Kopjo Linkun e Shpërndarjes</button>
+      </div>
+
+      <!-- ABONIMI ME KRIPTO (USDT) -->
+      <div id="subscriptionCard" class="crypto-box">
+        <div class="crypto-title">
+          <span>Abonohu Anonimisht me Kripto (USDT TRC20 / Binance)</span>
+          <span>₮ ₿</span>
+        </div>
+        <p class="crypto-desc">
+          Zgjidh paketën e abonimit dhe dërgo shumën e saktë në adresën USDT. Pas verifikimit automatik, aktivizohet abonimi dhe merren deri në <strong>10 tiketa</strong> (<strong>4–6 ndeshje</strong> për tiketë). Nëse skadon, llogaria mbahet në <strong>HOLD</strong>.
+        </p>
+
+        <div class="plans-grid">
+          <button class="plan-btn" data-plan="1m" type="button">1 muaj - 10 USDT</button>
+          <button class="plan-btn" data-plan="3m" type="button">3 muaj - 25 USDT</button>
+          <button class="plan-btn" data-plan="1y" type="button">1 vit - 75 USDT</button>
+        </div>
+
+        <div id="depositBox" class="deposit-box hidden">
+          <div><strong>Paketa e zgjedhur:</strong> <span id="selectedPlanLabel"></span></div>
+          <div><strong>Rrjeti:</strong> TRON (TRC20) — Binance</div>
+          <div class="wallet-addr" id="usdtAddressText">TUEKvgmjmk4jMGZtPqr3uJqH9bTudHQUtm</div>
+          <input id="txIdInput" class="input-field" style="text-align:left; margin-bottom:8px;" type="text" placeholder="Ngjit TxID / Hash të pagesës USDT (TRC20)..." />
+          <button id="verifyTxBtn" class="btn" type="button">Verifiko Automatike &amp; Aktivizo Abonimin</button>
+          <div id="subFeedback" class="error-msg"></div>
+        </div>
+      </div>
+
+      <!-- PANELI I ADMINISTRATORIT -->
+      <div id="adminPanel" class="crypto-box hidden">
+        <div class="admin-header">
+          <h3>Paneli i Administratorit</h3>
+          <button id="refreshAdminBtn" class="btn-sm" type="button">Rifresko</button>
+        </div>
+        <div id="adminUsersList" class="crypto-desc" style="margin-bottom:0;">Nuk ka përdorues.</div>
+      </div>
+
+      <!-- TIKETAT E SKANUARA & HISTORIKU -->
+      <div class="ticket-header-row">
+        <div id="ticketTitle" class="ticket-title">Tiketat e Skanuara (Saktësia: 75% - 85%):</div>
+      </div>
+      <div id="ticketTabsBar" class="ticket-tabs-bar"></div>
+      <div id="ticketSubmeta" class="ticket-submeta"></div>
+      <div id="matchesList"></div>
+    </div>
+  </div>
+
+  <script>
+    const DEVICE_STORAGE_KEY = 'janus_device_id_v1';
+    const NICK_STORAGE_KEY = 'janus_active_nick_v1';
+    const TICKET_HISTORY_PREFIX = 'janus_tickets_history_v1_';
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const incomingRef = (urlParams.get('ref') || '').trim();
+
+    function getDeviceId() {
+      let id = localStorage.getItem(DEVICE_STORAGE_KEY);
+      if (!id) {
+        id = 'dev_' + Math.random().toString(36).slice(2) + '_' + Date.now().toString(36);
+        localStorage.setItem(DEVICE_STORAGE_KEY, id);
+      }
+      return id;
+    }
+
+    function getSavedNick() {
+      return localStorage.getItem(NICK_STORAGE_KEY) || '';
+    }
+
+    function setSavedNick(nick) {
+      if (nick) localStorage.setItem(NICK_STORAGE_KEY, nick);
+      else localStorage.removeItem(NICK_STORAGE_KEY);
+    }
+
+    function getTicketStorageKey(nickname) {
+      return `${TICKET_HISTORY_PREFIX}${String(nickname || 'default').trim().toLowerCase()}`;
+    }
+
+    function loadTicketHistory(nickname) {
+      if (!nickname) return [];
+      try {
+        const raw = localStorage.getItem(getTicketStorageKey(nickname));
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveTicketHistory(nickname, tickets) {
+      if (!nickname) return;
+      try {
+        localStorage.setItem(getTicketStorageKey(nickname), JSON.stringify(tickets.slice(0, 40)));
+      } catch {
+        // Injoro nëse tejkalohet memoria e shfletuesit
+      }
+    }
+
+    const authView = document.getElementById('authView');
+    const appView = document.getElementById('appView');
+    const authForm = document.getElementById('authForm');
+    const authHeading = document.getElementById('authHeading');
+    const authSubmitBtn = document.getElementById('authSubmitBtn');
+    const toggleModeBtn = document.getElementById('toggleModeBtn');
+    const nicknameInput = document.getElementById('nicknameInput');
+    const passwordInput = document.getElementById('passwordInput');
+    const authError = document.getElementById('authError');
+
+    const welcomeText = document.getElementById('welcomeText');
+    const statusBadge = document.getElementById('statusBadge');
+    const quotaText = document.getElementById('quotaText');
+    const holdBanner = document.getElementById('holdBanner');
+    const scanBtn = document.getElementById('scanBtn');
+    const settleBtn = document.getElementById('settleBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const reportBox = document.getElementById('reportBox');
+
+    const referralLinkBox = document.getElementById('referralLinkBox');
+    const referralStatsText = document.getElementById('referralStatsText');
+    const copyRefBtn = document.getElementById('copyRefBtn');
+
+    const planButtons = [...document.querySelectorAll('.plan-btn')];
+    const depositBox = document.getElementById('depositBox');
+    const selectedPlanLabel = document.getElementById('selectedPlanLabel');
+    const usdtAddressText = document.getElementById('usdtAddressText');
+    const txIdInput = document.getElementById('txIdInput');
+    const verifyTxBtn = document.getElementById('verifyTxBtn');
+    const subFeedback = document.getElementById('subFeedback');
+
+    const adminPanel = document.getElementById('adminPanel');
+    const adminUsersList = document.getElementById('adminUsersList');
+    const refreshAdminBtn = document.getElementById('refreshAdminBtn');
+
+    const ticketTitle = document.getElementById('ticketTitle');
+    const ticketTabsBar = document.getElementById('ticketTabsBar');
+    const ticketSubmeta = document.getElementById('ticketSubmeta');
+    const matchesList = document.getElementById('matchesList');
+
+    let isRegisterMode = false;
+    let currentUser = null;
+    let selectedPlanId = null;
+    let scanCounter = 0;
+    let userTickets = [];
+    let activeTicketId = null;
+
+    ticketTabsBar.addEventListener('click', (ev) => {
+      const btn = ev.target.closest('[data-ticket-id]');
+      if (!btn) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+
+      const clickedId = String(btn.getAttribute('data-ticket-id') || '');
+      if (!clickedId) return;
+
+      activeTicketId = clickedId;
+      renderTicketSection();
+    });
+
+    function syncTicketsForUser(nickname) {
+      const loaded = loadTicketHistory(nickname);
+      userTickets = loaded.map((tkt, idx) => ({
+        ...tkt,
+        id: String(tkt.id || `tkt_fallback_${idx}`),
+        number: Number(tkt.number) || (loaded.length - idx),
+        matches: Array.isArray(tkt.matches) ? tkt.matches : [],
+      }));
+      scanCounter = userTickets.length;
+
+      if (userTickets.length > 0) {
+        const exists = userTickets.some((t) => String(t.id) === String(activeTicketId));
+        if (!activeTicketId || !exists) {
+          activeTicketId = String(userTickets[0].id);
+        }
+      } else {
+        activeTicketId = null;
+      }
+
+      renderTicketSection();
+    }
+
+    function applyUserUI(user) {
+      currentUser = user;
+      if (!user) {
+        userTickets = [];
+        activeTicketId = null;
+        authView.classList.remove('hidden');
+        appView.classList.add('hidden');
+        return;
+      }
+
+      authView.classList.add('hidden');
+      appView.classList.remove('hidden');
+
+      welcomeText.textContent = `Përshëndetje, ${user.nickname}!`;
+      const isAdmin = user.role === 'ADMIN_MASTER';
+
+      const refCode = user.referralCode || encodeURIComponent(String(user.nickname || '').toLowerCase());
+      const shareUrl = `${window.location.origin}/app?ref=${encodeURIComponent(refCode)}`;
+      referralLinkBox.textContent = shareUrl;
+      referralStatsText.innerHTML =
+        `Ftesa të suksesshme: <strong>${user.referralCount || 0}</strong> • ` +
+        `Ditë falas nga shpërndarja: <strong>${user.referralDaysRemaining || 0}</strong>`;
+
+      if (isAdmin) {
+        statusBadge.textContent = 'ADMIN MASTER';
+        statusBadge.className = 'status-active';
+        quotaText.innerHTML = 'Skanime: <strong>Unlimited</strong> • Tiketa: <strong>3–6 ndeshje</strong>';
+        holdBanner.classList.add('hidden');
+        scanBtn.disabled = false;
+        adminPanel.classList.remove('hidden');
+        loadAdminUsers(user.nickname);
+      } else {
+        adminPanel.classList.add('hidden');
+        if (user.accountStatus === 'HOLD') {
+          statusBadge.textContent = 'HOLD';
+          statusBadge.className = 'status-hold';
+          holdBanner.textContent = user.holdReason || 'Llogaria është në HOLD. Shpërndaj linkun (+10 ditë falas) ose abonohet me USDT.';
+          holdBanner.classList.remove('hidden');
+          scanBtn.disabled = true;
+        } else if (user.accountStatus === 'ACTIVE') {
+          statusBadge.textContent = 'AKTIV (ABONIM)';
+          statusBadge.className = 'status-active';
+          holdBanner.classList.add('hidden');
+          scanBtn.disabled = false;
+        } else {
+          statusBadge.textContent = 'FALAS';
+          statusBadge.className = 'status-free';
+          holdBanner.classList.add('hidden');
+          scanBtn.disabled = false;
+        }
+
+        const expText = user.subscriptionExpiresAt
+          ? new Date(user.subscriptionExpiresAt).toLocaleDateString('sq-AL')
+          : 'Nuk ka';
+
+        quotaText.innerHTML =
+          `Tiketa falas: <strong>${user.freeTicketsRemaining}</strong> (3–6 ndeshje) | ` +
+          `Ditë shpërndarjeje: <strong>${user.referralDaysRemaining || 0}</strong> | ` +
+          `Tiketa abonimi: <strong>${user.paidTicketsRemaining}</strong> (4–6 ndeshje) | ` +
+          `Skadimi: <strong>${expText}</strong>`;
+      }
+
+      syncTicketsForUser(user.nickname);
+    }
+
+    copyRefBtn.addEventListener('click', async () => {
+      const linkText = referralLinkBox.textContent || '';
+      if (!linkText) return;
+      try {
+        await navigator.clipboard.writeText(linkText);
+        copyRefBtn.textContent = 'Linku u kopjua!';
+        setTimeout(() => { copyRefBtn.textContent = 'Kopjo Linkun e Shpërndarjes'; }, 2000);
+      } catch {
+        copyRefBtn.textContent = 'Kopjo manualisht linkun më lart';
+      }
+    });
+
+    async function refreshUserStatus() {
+      const nick = getSavedNick();
+      if (!nick) {
+        applyUserUI(null);
+        return;
+      }
+      try {
+        const res = await fetch(`/api/client/status?nickname=${encodeURIComponent(nick)}`);
+        const data = await res.json();
+        if (data.ok && data.user) {
+          if (data.usdtAddress) usdtAddressText.textContent = data.usdtAddress;
+          applyUserUI(data.user);
+        } else {
+          setSavedNick('');
+          applyUserUI(null);
+        }
+      } catch {
+        applyUserUI(null);
+      }
+    }
+
+    toggleModeBtn.addEventListener('click', () => {
+      isRegisterMode = !isRegisterMode;
+      authError.textContent = '';
+      if (isRegisterMode) {
+        authHeading.textContent = 'Regjistrohu me Nickname (3 Tiketa Falas)';
+        authSubmitBtn.textContent = 'Regjistrohu';
+        toggleModeBtn.textContent = 'Ke tashmë llogari? Hyr këtu';
+      } else {
+        authHeading.textContent = 'Hyr në Llogari';
+        authSubmitBtn.textContent = 'Hyr / Login';
+        toggleModeBtn.textContent = 'Nuk ke llogari? Regjistrohu me nickname';
+      }
+    });
+
+    authForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      authError.textContent = '';
+
+      const nickname = nicknameInput.value.trim();
+      const password = passwordInput.value.trim();
+      const deviceId = getDeviceId();
+      const endpoint = isRegisterMode ? '/api/auth/register' : '/api/auth/login';
+
+      authSubmitBtn.disabled = true;
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            nickname,
+            password,
+            deviceId,
+            referralBy: isRegisterMode ? incomingRef : undefined,
+          }),
+        });
+        const data = await res.json();
+        if (!data.ok) {
+          authError.textContent = data.error || 'Gabim gjatë autentikimit.';
+          return;
+        }
+        setSavedNick(data.user.nickname);
+        applyUserUI(data.user);
+        loadReport();
+        if (!data.user.isHold && loadTicketHistory(data.user.nickname).length === 0) {
+          runScan();
+        }
+      } catch (err) {
+        authError.textContent = err.message || 'Gabim rrjeti.';
+      } finally {
+        authSubmitBtn.disabled = false;
+      }
+    });
+
+    logoutBtn.addEventListener('click', () => {
+      setSavedNick('');
+      applyUserUI(null);
+    });
+
+    planButtons.forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        if (!currentUser) return;
+        selectedPlanId = btn.dataset.plan;
+        planButtons.forEach((b) => b.classList.toggle('active', b === btn));
+        subFeedback.textContent = '';
+        subFeedback.className = 'error-msg';
+
+        try {
+          const res = await fetch('/api/subscription/select', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nickname: currentUser.nickname, planId: selectedPlanId }),
+          });
+          const data = await res.json();
+          if (data.ok) {
+            selectedPlanLabel.textContent = data.plan.label;
+            usdtAddressText.textContent = data.payment.address;
+            depositBox.classList.remove('hidden');
+          }
+        } catch {
+          depositBox.classList.remove('hidden');
+        }
+      });
+    });
+
+    verifyTxBtn.addEventListener('click', async () => {
+      if (!currentUser || !selectedPlanId) return;
+      const txId = txIdInput.value.trim();
+      subFeedback.textContent = 'Duke verifikuar transaksionin në rrjet...';
+      subFeedback.className = 'error-msg';
+      verifyTxBtn.disabled = true;
+
+      try {
+        const res = await fetch('/api/subscription/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            nickname: currentUser.nickname,
+            planId: selectedPlanId,
+            txId,
+          }),
+        });
+        const data = await res.json();
+        if (!data.ok) {
+          subFeedback.textContent = data.error || 'Verifikimi dështoi.';
+          subFeedback.className = 'error-msg';
+          return;
+        }
+        subFeedback.textContent = data.message || 'Abonimi u aktivizua!';
+        subFeedback.className = 'ok-msg';
+        txIdInput.value = '';
+        applyUserUI(data.user);
+      } catch (err) {
+        subFeedback.textContent = err.message || 'Gabim gjatë verifikimit.';
+        subFeedback.className = 'error-msg';
+      } finally {
+        verifyTxBtn.disabled = false;
+      }
+    });
+
+    async function loadAdminUsers(adminNick) {
+      try {
+        const res = await fetch(`/api/admin/users?admin=${encodeURIComponent(adminNick)}`);
+        const data = await res.json();
+        if (!data.ok || !Array.isArray(data.users) || !data.users.length) {
+          adminUsersList.textContent = 'Nuk ka përdorues.';
+          return;
+        }
+        adminUsersList.innerHTML = data.users
+          .map((u) =>
+            `• <strong>${u.nickname}</strong> | Statusi: <strong>${u.accountStatus}</strong> | ` +
+            `Falas: <strong>${u.freeTicketsRemaining}</strong> | Ditë ref: <strong>${u.referralDaysRemaining || 0}</strong> | ` +
+            `Abonim: <strong>${u.paidTicketsRemaining}</strong>`
+          )
+          .join('<br>');
+      } catch {
+        adminUsersList.textContent = 'Nuk u ngarkua lista e përdoruesve.';
+      }
+    }
+
+    refreshAdminBtn.addEventListener('click', () => {
+      if (currentUser?.nickname) loadAdminUsers(currentUser.nickname);
+    });
+
+    function resolveOutcomeDot(match) {
+      if (match.outcomeDot) return match.outcomeDot;
+      const out = String(match.outcome || 'PENDING').toUpperCase();
+      if (out === 'WIN') return '🟢';
+      if (out === 'LOSS') return '🔴';
+      if (out === 'VOID') return '⚪';
+      return '🟡';
+    }
+
+    function resolveOutcomeText(match) {
+      if (match.outcomeLabel) return match.outcomeLabel;
+      const out = String(match.outcome || 'PENDING').toUpperCase();
+      if (out === 'WIN') return '🟢 Fituar';
+      if (out === 'LOSS') return '🔴 Humbur';
+      if (out === 'VOID') return '⚪ Anuluar';
+      return match.isLive ? '🟡 Live / Në pritje' : '🟡 Në pritje';
+    }
+
+    function renderReport(report) {
+      if (!report) return;
+      const acc = report.accuracyPercent !== null && report.accuracyPercent !== undefined
+        ? `${report.accuracyPercent}%`
+        : 'N/A';
+
+      reportBox.innerHTML =
+        `<strong>Statistika Feedback Loop:</strong> ` +
+        `Fitore: <strong>${report.wins ?? 0}</strong> | ` +
+        `Humbje: <strong>${report.losses ?? 0}</strong> | ` +
+        `Në pritje: <strong>${report.pendingCount ?? 0}</strong> | ` +
+        `Saktësia reale: <strong>${acc}</strong>`;
+    }
+
+    function getTicketSummaryBadge(ticket) {
+      const list = Array.isArray(ticket?.matches) ? ticket.matches : [];
+      let wins = 0;
+      let losses = 0;
+      let pending = 0;
+      for (const m of list) {
+        const out = String(m.outcome || 'PENDING').toUpperCase();
+        if (out === 'WIN') wins += 1;
+        else if (out === 'LOSS') losses += 1;
+        else pending += 1;
+      }
+      if (wins > 0 && losses === 0 && pending === 0) return '🟢';
+      if (losses > 0) return '🔴';
+      return '🟡';
+    }
+
+    function renderTicketSection() {
+      if (!ticketTabsBar || !matchesList || !ticketTitle || !ticketSubmeta) return;
+
+      ticketTabsBar.innerHTML = '';
+      ticketTabsBar.classList.remove('hidden');
+      matchesList.classList.remove('hidden');
+
+      if (!Array.isArray(userTickets) || userTickets.length === 0) {
+        ticketTitle.textContent = 'Tiketat e Skanuara (Saktësia: 75% - 85%):';
+        ticketSubmeta.textContent = 'Nuk ka ende tiketë të skanuar. Shtyp "Skalo Ndeshjet e Konfirmuara (Live)" për të krijuar Tiketën #1.';
+        matchesList.innerHTML = '';
+        return;
+      }
+
+      userTickets.forEach((tkt, idx) => {
+        const tktId = String(tkt.id ?? idx);
+        tkt.id = tktId;
+        const tktNum = Number(tkt.number) || (userTickets.length - idx);
+        const isSelected = tktId === String(activeTicketId);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.setAttribute('data-ticket-id', tktId);
+        btn.className = `ticket-tab-btn${isSelected ? ' active' : ''}`;
+        const badge = getTicketSummaryBadge(tkt);
+        const count = Array.isArray(tkt.matches) ? tkt.matches.length : 0;
+        btn.textContent = `${badge} Tiketa #${tktNum} (${count})`;
+        ticketTabsBar.appendChild(btn);
+      });
+
+      const activeTicket =
+        userTickets.find((t) => String(t.id) === String(activeTicketId)) || userTickets[0];
+      activeTicketId = String(activeTicket.id);
+      const activeNum = Number(activeTicket.number) || 1;
+
+      const matches = Array.isArray(activeTicket.matches) ? activeTicket.matches : [];
+      const createdDate = activeTicket.createdAt
+        ? new Date(activeTicket.createdAt).toLocaleString('sq-AL')
+        : '';
+
+      ticketTitle.textContent = `Tiketa #${activeNum} (${matches.length} Ndeshje Reale | Saktësia: ${activeTicket.accuracyRange || '75% - 85%'}):`;
+      ticketSubmeta.textContent =
+        `Duke parë: Tiketa #${activeNum} nga ${userTickets.length} tiketa të ruajtura` +
+        (createdDate ? ` • Skanuar më: ${createdDate}` : '');
+
+      renderMatches(matches);
+    }
+
+    function renderMatches(matches = []) {
+      if (!matchesList) return;
+      const list = Array.isArray(matches) ? matches : [];
+
+      if (!list.length) {
+        matchesList.innerHTML = '<div class="match-card">Nuk ka ndeshje të kampionateve kryesore për momentin sot.</div>';
+        return;
+      }
+
+      matchesList.innerHTML = list.map((m) => {
+        const safeMatch = m && typeof m === 'object' ? m : {};
+        const dot = resolveOutcomeDot(safeMatch);
+        const outcomeText = resolveOutcomeText(safeMatch);
+        const liveBadge = safeMatch.isLive
+          ? `<span class="live-pill">🔴 ${safeMatch.liveLabel || (safeMatch.score ? `LIVE ${safeMatch.score}` : 'LIVE')}</span>`
+          : '';
+        const scoreText = !safeMatch.isLive && (safeMatch.fullTimeScore || safeMatch.score)
+          ? ` (${safeMatch.fullTimeScore || safeMatch.score})`
+          : '';
+
+        const lossReasonBox = safeMatch.lossReason
+          ? `<div class="loss-reason-box"><strong>Analiza e humbjes / korrigjimit:</strong> ${safeMatch.lossReason}</div>`
+          : '';
+
+        const weatherLine = safeMatch.intel?.weatherSummary
+          ? `<p>🌦️ <strong>Moti &amp; Fusha:</strong> ${safeMatch.intel.weatherSummary} — ${safeMatch.intel.pitchImpact || ''}</p>`
+          : '';
+
+        const safetyLine = safeMatch.intel && safeMatch.intel.safetyScore !== undefined
+          ? `<p>🛡️ <strong>Siguria &amp; Anomalitë:</strong> Siguria ${safeMatch.intel.safetyScore}/100 | Rrezik anomalie ${safeMatch.intel.anomalyRisk ?? 0}/100${safeMatch.intel.isSuspicious ? ' (⚠️ Rrezik i lartë)' : ''}</p>`
+          : '';
+
+        return `
+          <div class="match-card">
+            <div class="match-meta">🗓️ ${safeMatch.date || ''} | ${safeMatch.league || ''}</div>
+            <div class="match-title">
+              <span>${dot} ${safeMatch.home || ''} vs ${safeMatch.away || ''}${scoreText}</span>
+              ${liveBadge}
+            </div>
+            <div class="outcome-pill">Statusi i ndeshjes: ${outcomeText}</div>
+            ${lossReasonBox}
+            <div class="pick-line">
+              Rekomandimi: <strong>${safeMatch.betType || ''}</strong> | Kuota: <strong>${safeMatch.odd || ''}</strong>
+            </div>
+            <div class="analysis-box">
+              <p>📊 <strong>Forma &amp; Motivimi:</strong> ${safeMatch.homeForm || ''} vs ${safeMatch.awayForm || ''}</p>
+              <p>⚙️ <strong>Taktika:</strong> ${safeMatch.tactics || ''}</p>
+              <p>🏥 <strong>Dëmtimet:</strong> ${safeMatch.injuries || ''}</p>
+              <p>⚽ <strong>Golat:</strong> ${safeMatch.goalsAnalysis || ''}</p>
+              ${weatherLine}
+              ${safetyLine}
+              <p>📈 <strong>Probabiliteti:</strong> ${safeMatch.winProb || `Saktësia e analizës: ${safeMatch.confidenceScore || 78}% (zonë 75%–85%)`}</p>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function refreshTicketsFromBackendAfterSettle() {
+      if (!currentUser?.nickname || !Array.isArray(userTickets) || userTickets.length === 0) return;
+
+      const allMatchIds = [];
+      for (const tkt of userTickets) {
+        for (const m of (tkt.matches || [])) {
+          if (m?.id !== undefined && m?.id !== null) {
+            allMatchIds.push(String(m.id));
+          }
+        }
+      }
+
+      if (allMatchIds.length === 0) return;
+
+      try {
+        const res = await fetch('/api/feedback/matches-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ matchIds: [...new Set(allMatchIds)] }),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.ok || !Array.isArray(data.matches)) return;
+
+        const mapById = new Map(data.matches.map((item) => [String(item.id), item]));
+        userTickets = userTickets.map((tkt) => ({
+          ...tkt,
+          matches: (tkt.matches || []).map((m) => {
+            const updated = mapById.get(String(m.id));
+            return updated ? { ...m, ...updated } : m;
+          }),
+        }));
+
+        saveTicketHistory(currentUser.nickname, userTickets);
+        renderTicketSection();
+      } catch {
+        // Nëse rruga nuk ekziston ende, ruhen tiketat ekzistuese pa gabim
+      }
+    }
+
+    async function loadReport() {
+      try {
+        const res = await fetch('/api/feedback/report');
+        const data = await res.json();
+        if (data.ok && data.report) renderReport(data.report);
+      } catch {
+        // Injoro nëse nuk ka ende të dhëna
+      }
+    }
+
+    async function runScan() {
+      if (!currentUser) return;
+      scanBtn.disabled = true;
+      scanBtn.textContent = 'Duke skanuar...';
+      scanCounter += 1;
+
+      try {
+        const res = await fetch(
+          `/api/scan?nickname=${encodeURIComponent(currentUser.nickname)}&scanIndex=${scanCounter}`
+        );
+        const data = await res.json();
+
+        if (data.user) {
+          applyUserUI(data.user);
+        }
+
+        if (!data.ok) {
+          matchesList.innerHTML = `<div class="match-card">${data.error || 'Llogaria është në HOLD.'}</div>`;
+          return;
+        }
+
+        const existing = loadTicketHistory(currentUser.nickname);
+        const nextNumber = existing.length + 1;
+        const newTicket = {
+          id: `tkt_${Date.now()}_${nextNumber}`,
+          number: nextNumber,
+          createdAt: new Date().toISOString(),
+          accuracyRange: data.accuracyRange || '75% - 85%',
+          matches: Array.isArray(data.matches) ? data.matches : [],
+        };
+
+        userTickets = [newTicket, ...existing];
+        activeTicketId = String(newTicket.id);
+        saveTicketHistory(currentUser.nickname, userTickets);
+        renderTicketSection();
+
+        await loadReport();
+      } catch (err) {
+        matchesList.innerHTML = `<div class="match-card">Gabim: ${err.message}</div>`;
+      } finally {
+        if (currentUser && !currentUser.isHold) {
+          scanBtn.disabled = false;
+        }
+        scanBtn.textContent = 'Skalo Ndeshjet e Konfirmuara (Live)';
+      }
+    }
+
+    async function runSettle() {
+      settleBtn.disabled = true;
+      settleBtn.textContent = 'Duke verifikuar...';
+      try {
+        const res = await fetch('/api/feedback/settle', { method: 'POST' });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || 'Gabim gjatë verifikimit');
+        if (data.report) renderReport(data.report);
+        await refreshUserStatus();
+        await refreshTicketsFromBackendAfterSettle();
+      } catch (err) {
+        reportBox.textContent = `Gabim gjatë verifikimit: ${err.message}`;
+      } finally {
+        settleBtn.disabled = false;
+        settleBtn.textContent = 'Verifiko Rezultatet e Mbyllura';
+      }
+    }
+
+    scanBtn.addEventListener('click', runScan);
+    settleBtn.addEventListener('click', runSettle);
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      });
+    }
+
+    (async () => {
+      await refreshUserStatus();
+      await loadReport();
+    })();
+  </script>
+</body>
+</html>
